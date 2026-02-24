@@ -102,7 +102,7 @@
 
     function App() {
       const [activeTab, setActiveTab] = useState('area_hr');
-      const [isLoading, setIsLoading] = useState(true); // เพิ่ม State สำหรับโหลดข้อมูลจาก Cloud
+      const [isLoading, setIsLoading] = useState(true); 
       
       // --- STATE: ข้อมูลตั้งต้น ---
       const [appBranches, setAppBranches] = useState([]);
@@ -137,20 +137,27 @@
           setIsLoading(true);
           try {
             if (GOOGLE_SCRIPT_URL) {
-              // เพิ่ม Time Parameter เพื่อป้องกันเบราว์เซอร์จำข้อมูลแคช (Cache Busting)
               const res = await fetch(`${GOOGLE_SCRIPT_URL}?t=${new Date().getTime()}`);
               const data = await res.json();
-              if (data.applicants) setApplicants(data.applicants);
-              if (data.vacancies) setVacancies(data.vacancies);
               
-              // โหลดข้อมูล Master จาก Cloud ถ้ามี (เพื่อให้ทุกคนเห็นสาขาตรงกัน)
-              if (data.branches && data.branches.length > 0) setAppBranches(data.branches);
-              else setAppBranches(DEFAULT_BRANCHES);
+              // Normalize data from sheet (ป้องกันบัค Type เปลี่ยนจากข้อความเป็นตัวเลข)
+              if (data.applicants) {
+                setApplicants(data.applicants.map(a => ({...a, id: String(a.id), branchCode: String(a.branchCode).padStart(3, '0')})));
+              }
+              if (data.vacancies) {
+                setVacancies(data.vacancies.map(v => ({...v, id: String(v.id), branchCode: String(v.branchCode).padStart(3, '0')})));
+              }
               
-              if (data.tas && data.tas.length > 0) setAppTAs(data.tas.map(t => t.name || t));
+              if (data.branches && data.branches.length > 0) {
+                setAppBranches(data.branches.map(b => ({...b, code: String(b.code).padStart(3, '0')})));
+              } else {
+                setAppBranches(DEFAULT_BRANCHES);
+              }
+              
+              if (data.tas && data.tas.length > 0) setAppTAs(data.tas.map(t => String(t.name || t)));
               else setAppTAs(DEFAULT_TAS);
               
-              if (data.positions && data.positions.length > 0) setAppPositions(data.positions.map(p => p.name || p));
+              if (data.positions && data.positions.length > 0) setAppPositions(data.positions.map(p => String(p.name || p)));
               else setAppPositions(DEFAULT_POSITIONS);
 
             }
@@ -178,7 +185,7 @@
       // สร้างรายชื่อ Area ให้เรียงตามตัวเลข
       useEffect(() => {
         if (appBranches.length > 0) {
-          const uniqueAreas = [...new Set(appBranches.map(b => b.area))].sort((a,b) => {
+          const uniqueAreas = [...new Set(appBranches.map(b => String(b.area)))].sort((a,b) => {
             const numA = parseInt(a.replace(/\D/g, '')) || 0;
             const numB = parseInt(b.replace(/\D/g, '')) || 0;
             return numA - numB;
@@ -368,7 +375,7 @@
         const newRecord = { 
           id: Date.now().toString(), 
           ta: selectedTA, 
-          branchCode: addingApplicantFor.branchCode, 
+          branchCode: String(addingApplicantFor.branchCode).padStart(3, '0'), 
           branchName: addingApplicantFor.branchName, 
           position: addingApplicantFor.position,
           ...formData, 
@@ -385,7 +392,7 @@
 
       const deleteApplicant = (id) => {
         if (window.confirm('คุณแน่ใจหรือไม่ที่จะลบข้อมูลผู้สมัครรายนี้?')) {
-          const newApps = applicants.filter(a => a.id !== id);
+          const newApps = applicants.filter(a => String(a.id) !== String(id));
           setApplicants(newApps);
           syncToCloud(newApps, vacancies);
         }
@@ -393,7 +400,7 @@
 
       const submitEditApplicant = (e) => {
         e.preventDefault();
-        const newApps = applicants.map(a => a.id === editingApplicant.id ? editingApplicant : a);
+        const newApps = applicants.map(a => String(a.id) === String(editingApplicant.id) ? editingApplicant : a);
         setApplicants(newApps);
         setEditingApplicant(null);
         syncToCloud(newApps, vacancies);
@@ -408,16 +415,24 @@
 
       const handleVacancySubmit = (e) => {
         e.preventDefault();
-        const branch = appBranches.find(b => b.code === vacancyForm.branchCode);
-        if (!branch) return;
+        // แก้ไขปัญหารหัสสาขา 001 เป็นเลข 1 แล้วเทียบกันไม่เจอ โดยใช้ String() ครอบเสมอ
+        const branch = appBranches.find(b => String(b.code) === String(vacancyForm.branchCode));
+        if (!branch) { 
+          alert('เกิดข้อผิดพลาด: ไม่พบข้อมูลสาขาในระบบ กรุณาเลือกสาขาใหม่'); 
+          return; 
+        }
 
-        const isDuplicate = vacancies.some(v => v.branchCode === branch.code && v.position === vacancyForm.position && v.manualStatus !== 'Closed');
+        const isDuplicate = vacancies.some(v => 
+          String(v.branchCode) === String(branch.code) && 
+          String(v.position) === String(vacancyForm.position) && 
+          v.manualStatus !== 'Closed'
+        );
         if (isDuplicate) { alert(`มีตำแหน่ง "${vacancyForm.position}" เปิดรับในสาขานี้อยู่แล้ว!`); return; }
 
         const newVacancy = { 
           id: Date.now().toString(), 
           area: branch.area, 
-          branchCode: branch.code, 
+          branchCode: String(branch.code).padStart(3, '0'), 
           branchName: branch.name, 
           position: vacancyForm.position, 
           manualStatus: vacancyForm.manualStatus, 
@@ -433,7 +448,7 @@
 
       const deleteVacancy = (id) => {
         if (window.confirm('คุณแน่ใจหรือไม่ที่จะลบตำแหน่งงานนี้?')) {
-          const newVacs = vacancies.filter(v => v.id !== id);
+          const newVacs = vacancies.filter(v => String(v.id) !== String(id));
           setVacancies(newVacs);
           syncToCloud(applicants, newVacs);
         }
@@ -441,18 +456,23 @@
 
       const submitEditVacancy = (e) => {
         e.preventDefault();
-        const isDuplicate = vacancies.some(v => v.id !== editingVacancy.id && v.branchCode === editingVacancy.branchCode && v.position === editingVacancy.position && v.manualStatus !== 'Closed');
+        const isDuplicate = vacancies.some(v => 
+          String(v.id) !== String(editingVacancy.id) && 
+          String(v.branchCode) === String(editingVacancy.branchCode) && 
+          String(v.position) === String(editingVacancy.position) && 
+          v.manualStatus !== 'Closed'
+        );
         if (isDuplicate) { alert(`มีตำแหน่ง "${editingVacancy.position}" เปิดรับในสาขานี้อยู่แล้ว!`); return; }
         
-        const branch = appBranches.find(b => b.code === editingVacancy.branchCode);
-        const newVacs = vacancies.map(v => v.id === editingVacancy.id ? { ...editingVacancy, area: branch.area, branchName: branch.name } : v);
+        const branch = appBranches.find(b => String(b.code) === String(editingVacancy.branchCode));
+        const newVacs = vacancies.map(v => String(v.id) === String(editingVacancy.id) ? { ...editingVacancy, area: branch ? branch.area : v.area, branchName: branch ? branch.name : v.branchName } : v);
         setVacancies(newVacs);
         setEditingVacancy(null);
         syncToCloud(applicants, newVacs);
       };
 
       const closeVacancy = (id) => {
-        const newVacs = vacancies.map(v => v.id === id ? { ...v, manualStatus: 'Closed' } : v);
+        const newVacs = vacancies.map(v => String(v.id) === String(id) ? { ...v, manualStatus: 'Closed' } : v);
         setVacancies(newVacs);
         syncToCloud(applicants, newVacs);
       };
@@ -462,7 +482,7 @@
       const filteredVacancies = vacancies.filter(v => selectedAreas.length === 0 || selectedAreas.includes(v.area));
 
       const getVacancyInsights = (branchCode, position, manualStatus, createdAt) => {
-        const matchedApplicants = applicants.filter(app => app.branchCode === branchCode && app.position === position);
+        const matchedApplicants = applicants.filter(app => String(app.branchCode) === String(branchCode) && String(app.position) === String(position));
         const applicantCount = matchedApplicants.length;
         let computedStatus = manualStatus;
         if (manualStatus !== 'Closed') {
@@ -473,22 +493,22 @@
         return { applicantCount, computedStatus, slaDays, matchedApplicants };
       };
 
-      // สำหรับแท็บ Recruit: กรองตำแหน่งงานที่ยังไม่ปิดรับ (เพื่อให้ Recruit เลือกเพิ่มคน)
+      // สำหรับแท็บ Recruit: กรองตำแหน่งงานที่ยังไม่ปิดรับ
       const activeVacanciesForRecruit = useMemo(() => {
         return vacancies.filter(v => {
           if (v.manualStatus === 'Closed') return false;
-          if (recruitAreaFilter && v.area !== recruitAreaFilter) return false;
-          if (recruitBranchFilter && v.branchCode !== recruitBranchFilter) return false;
+          if (recruitAreaFilter && String(v.area) !== String(recruitAreaFilter)) return false;
+          if (recruitBranchFilter && String(v.branchCode) !== String(recruitBranchFilter)) return false;
           return true;
         });
       }, [vacancies, recruitAreaFilter, recruitBranchFilter]);
 
-      const branchesForRecruitFilter = appBranches.filter(b => !recruitAreaFilter || b.area === recruitAreaFilter);
+      const branchesForRecruitFilter = appBranches.filter(b => !recruitAreaFilter || String(b.area) === String(recruitAreaFilter));
       
       // ประวัติของ TA ปัจจุบัน
-      const myApplicants = applicants.filter(app => app.ta === selectedTA);
+      const myApplicants = applicants.filter(app => String(app.ta) === String(selectedTA));
 
-      const dashboardData = useMemo(() => dashboardTA === 'ALL' ? applicants : applicants.filter(app => app.ta === dashboardTA), [applicants, dashboardTA]);
+      const dashboardData = useMemo(() => dashboardTA === 'ALL' ? applicants : applicants.filter(app => String(app.ta) === String(dashboardTA)), [applicants, dashboardTA]);
       
       const statusChartData = useMemo(() => {
         const counts = {}; dashboardData.forEach(app => counts[app.status] = (counts[app.status] || 0) + 1);
