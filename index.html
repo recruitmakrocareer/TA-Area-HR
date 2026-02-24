@@ -38,7 +38,7 @@
     // ==========================================
     // ⚙️ การตั้งค่า GOOGLE SHEETS API
     // ==========================================
-    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby8kcSKHAIz_K2DsYj7bXaAlr5t_ZZ3DigZ99x8C1BicfbZkY4CQuYE8kOf5HyiwOdTcw/exec"; 
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzM4EXsW141-nqY7rRwU_MFc9vnrJSbK-8Wdwn-ZJwvfEBlNMZJH2dhE0r2C4uJf7mnxg/exec"; 
 
     // --- MOCK DATA ---
     const DEFAULT_TAS = ['TA 1 (คุณเอ)', 'TA 2 (คุณบี)', 'TA 3 (คุณซี)', 'TA 4 (คุณดี)'];
@@ -141,6 +141,17 @@
               const data = await res.json();
               if (data.applicants) setApplicants(data.applicants);
               if (data.vacancies) setVacancies(data.vacancies);
+              
+              // โหลดข้อมูล Master จาก Cloud ถ้ามี (เพื่อให้ทุกคนเห็นสาขาตรงกัน)
+              if (data.branches && data.branches.length > 0) setAppBranches(data.branches);
+              else setAppBranches(DEFAULT_BRANCHES);
+              
+              if (data.tas && data.tas.length > 0) setAppTAs(data.tas.map(t => t.name));
+              else setAppTAs(DEFAULT_TAS);
+              
+              if (data.positions && data.positions.length > 0) setAppPositions(data.positions.map(p => p.name));
+              else setAppPositions(DEFAULT_POSITIONS);
+
             }
           } catch (e) {
             console.error("ดึงข้อมูลจาก Cloud ไม่สำเร็จ, ใช้ข้อมูลสำรองในเครื่อง", e);
@@ -148,21 +159,11 @@
             const localVacs = localStorage.getItem('hr_vacancies');
             if(localApps) setApplicants(JSON.parse(localApps));
             if(localVacs) setVacancies(JSON.parse(localVacs));
+            setAppBranches(DEFAULT_BRANCHES);
+            setAppTAs(DEFAULT_TAS);
+            setAppPositions(DEFAULT_POSITIONS);
           }
           
-          // โหลดการตั้งค่าสาขา TA และ ตำแหน่ง จากในเครื่องของผู้ใช้ (เพราะไฟล์ CSV อัปโหลดไว้ที่เครื่องใครเครื่องมัน)
-          const localBranches = localStorage.getItem('hr_branches');
-          if (localBranches) { try { setAppBranches(JSON.parse(localBranches)); } catch(e) {} }
-          else { setAppBranches(DEFAULT_BRANCHES); }
-
-          const localTAs = localStorage.getItem('hr_tas');
-          if (localTAs) { try { setAppTAs(JSON.parse(localTAs)); } catch(e) {} }
-          else { setAppTAs(DEFAULT_TAS); }
-
-          const localPositions = localStorage.getItem('hr_positions');
-          if (localPositions) { try { setAppPositions(JSON.parse(localPositions)); } catch(e) {} }
-          else { setAppPositions(DEFAULT_POSITIONS); }
-
           setIsLoading(false);
         };
         
@@ -181,9 +182,8 @@
         }
       }, [appBranches]);
 
-      // --- ฟังก์ชัน Sync ขึ้น Google Sheets (ทุกครั้งที่มีการกดเซฟ แก้ไข หรือลบ) ---
+      // --- ฟังก์ชัน Sync การทำรายการบันทึก (Applicants, Vacancies) ขึ้น Cloud ---
       const syncToCloud = async (newApps, newVacs) => {
-        // แบคอัปไว้ในเครื่องกันพลาด
         localStorage.setItem('hr_applicants', JSON.stringify(newApps));
         localStorage.setItem('hr_vacancies', JSON.stringify(newVacs));
         
@@ -201,6 +201,26 @@
         }
       };
 
+      // --- ฟังก์ชัน Sync Master Data (Branches, TAs, Positions) ขึ้น Cloud ---
+      const syncMasterToCloud = async (newBranches, newTAs, newPositions) => {
+        if (GOOGLE_SCRIPT_URL) {
+          try {
+            await fetch(GOOGLE_SCRIPT_URL, {
+              method: 'POST',
+              mode: 'no-cors',
+              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify({ 
+                action: 'updateMaster', 
+                branches: newBranches, 
+                tas: newTAs.map(name => ({name})), 
+                positions: newPositions.map(name => ({name})) 
+              })
+            });
+          } catch (error) {
+            console.error('Sync Master Error:', error);
+          }
+        }
+      };
 
       // --- IMPORT CSV FUNCTIONS ---
       const handleImportCSV = (e) => {
@@ -227,8 +247,8 @@
 
             if (newBranches.length > 0) {
               setAppBranches(newBranches);
-              localStorage.setItem('hr_branches', JSON.stringify(newBranches));
-              alert(`อัปเดตข้อมูลสาขาสำเร็จ! นำเข้าทั้งหมด ${newBranches.length} สาขา`);
+              syncMasterToCloud(newBranches, appTAs, appPositions);
+              alert(`อัปเดตข้อมูลสาขาและส่งขึ้นระบบเรียบร้อย! นำเข้าทั้งหมด ${newBranches.length} สาขา`);
             } else {
               alert('ไม่พบข้อมูลในไฟล์ หรือรูปแบบคอลัมน์ไม่ถูกต้อง (ต้องมี Store No., Location Name, Area No.)');
             }
@@ -262,8 +282,8 @@
 
             if (newTAs.length > 0) {
               setAppTAs(newTAs);
-              localStorage.setItem('hr_tas', JSON.stringify(newTAs));
-              alert(`อัปเดตรายชื่อ TA สำเร็จ! นำเข้าทั้งหมด ${newTAs.length} รายชื่อ`);
+              syncMasterToCloud(appBranches, newTAs, appPositions);
+              alert(`อัปเดตรายชื่อ TA และส่งขึ้นระบบเรียบร้อย! นำเข้าทั้งหมด ${newTAs.length} รายชื่อ`);
             } else {
               alert('ไม่พบข้อมูลในไฟล์ (ข้อมูลชื่อ TA ต้องอยู่ในคอลัมน์แรกสุด)');
             }
@@ -297,8 +317,8 @@
 
             if (newPositions.length > 0) {
               setAppPositions(newPositions);
-              localStorage.setItem('hr_positions', JSON.stringify(newPositions));
-              alert(`อัปเดตตำแหน่งงานสำเร็จ! นำเข้าทั้งหมด ${newPositions.length} รายการ`);
+              syncMasterToCloud(appBranches, appTAs, newPositions);
+              alert(`อัปเดตตำแหน่งงานและส่งขึ้นระบบเรียบร้อย! นำเข้าทั้งหมด ${newPositions.length} รายการ`);
             } else {
               alert('ไม่พบข้อมูลในไฟล์ (ข้อมูลตำแหน่งงานต้องอยู่ในคอลัมน์แรกสุด)');
             }
