@@ -118,7 +118,7 @@
     const VACANCY_STATUSES = ['Vacant', 'Promote&Transfer', 'Hold', 'Closed'];
 
     const STATUS_COLORS = { 'รอสัมภาษณ์': '#F59E0B', 'ไม่เข้าสัมภาษณ์': '#64748B', 'ผ่าน': '#10B981', 'ไม่ผ่าน': '#EF4444', 'สำรอง': '#3B82F6', 'ตรวจสุขภาพ': '#8B5CF6', 'รอเริ่มงาน': '#0EA5E9', 'มาเริ่มงาน': '#059669', 'ไม่มาเริ่มงาน': '#94A3B8', 'อื่นๆ': '#F97316' };
-    const VACANCY_COLORS = { 'Vacant': '#F59E0B', 'Promote&Transfer': '#8B5CF6', 'Hold': '#64748B', 'Closed': '#94A3B8', 'รอตรวจสุขภาพ': '#0EA5E9', 'Hiring': '#10B981' };
+    const VACANCY_COLORS = { 'Vacant': '#F59E0B', 'Promote&Transfer': '#8B5CF6', 'Hold': '#64748B', 'Closed': '#94A3B8', 'รอตรวจสุขภาพ': '#0EA5E9', 'รอเริ่มงาน': '#0EA5E9', 'Hiring': '#10B981' };
 
     function App() {
       const [activeTab, setActiveTab] = useState('area_hr');
@@ -138,7 +138,7 @@
       const [recruitAreaFilter, setRecruitAreaFilter] = useState('');
       const [recruitBranchFilter, setRecruitBranchFilter] = useState('');
       const [addingApplicantFor, setAddingApplicantFor] = useState(null);
-      const [formData, setFormData] = useState({ name: '', phone: '', status: '', comment: '', resumeName: '', resumeBase64: '' });
+      const [formData, setFormData] = useState({ name: '', phone: '', status: '', comment: '', startDate: '', resumeName: '', resumeBase64: '' });
       const [applicants, setApplicants] = useState([]);
       
       // --- STATE: Inline Row Editing (Recruit) ---
@@ -185,11 +185,42 @@
               const res = await fetch(`${GOOGLE_SCRIPT_URL}?t=${new Date().getTime()}`);
               const data = await res.json();
               
+              let loadedApps = [];
+              let loadedVacs = [];
+
               if (data.applicants) {
-                setApplicants(data.applicants.map(a => ({...a, id: String(a.id), branchCode: String(a.branchCode).padStart(3, '0')})));
+                loadedApps = data.applicants.map(a => ({...a, id: String(a.id), branchCode: String(a.branchCode).padStart(3, '0')}));
               }
               if (data.vacancies) {
-                setVacancies(data.vacancies.map(v => ({...v, id: String(v.id), branchCode: String(v.branchCode).padStart(3, '0')})));
+                loadedVacs = data.vacancies.map(v => ({...v, id: String(v.id), branchCode: String(v.branchCode).padStart(3, '0')}));
+              }
+
+              // ==========================================
+              // ⚙️ AUTO-UPDATE LOGIC (เมื่อถึงวันเริ่มงาน ให้ปรับสถานะอัตโนมัติ)
+              // ==========================================
+              let needsAutoSync = false;
+              const today = new Date();
+              today.setHours(0,0,0,0);
+              
+              loadedApps = loadedApps.map(a => {
+                if (a.status === 'รอเริ่มงาน' && a.startDate) {
+                  const sDate = new Date(a.startDate);
+                  sDate.setHours(0,0,0,0);
+                  // ถ้าถึงวันเริ่มงานแล้ว (วันที่เริ่มงาน <= วันนี้)
+                  if (sDate <= today) {
+                    needsAutoSync = true;
+                    return { ...a, status: 'มาเริ่มงาน' };
+                  }
+                }
+                return a;
+              });
+
+              setApplicants(loadedApps);
+              setVacancies(loadedVacs);
+
+              // ถ้ามีการสับเปลี่ยนสถานะออโต้ ให้ยิงซิงค์กลับไปที่ Cloud เพื่ออัปเดตคนอื่นด้วย
+              if (needsAutoSync) {
+                syncToCloud(loadedApps, loadedVacs);
               }
               
               if (data.branches && data.branches.length > 0) {
@@ -207,10 +238,34 @@
             }
           } catch (e) {
             console.error("ดึงข้อมูลจาก Cloud ไม่สำเร็จ, ใช้ข้อมูลสำรองในเครื่อง", e);
-            const localApps = localStorage.getItem('hr_applicants');
-            const localVacs = localStorage.getItem('hr_vacancies');
-            if(localApps) setApplicants(JSON.parse(localApps));
-            if(localVacs) setVacancies(JSON.parse(localVacs));
+            let localApps = localStorage.getItem('hr_applicants');
+            let localVacs = localStorage.getItem('hr_vacancies');
+            
+            if (localApps) localApps = JSON.parse(localApps);
+            else localApps = [];
+            if (localVacs) localVacs = JSON.parse(localVacs);
+            else localVacs = [];
+
+            // ทำ Auto-Update สำหรับ Local Storage ด้วย
+            let needsAutoSync = false;
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            
+            localApps = localApps.map(a => {
+              if (a.status === 'รอเริ่มงาน' && a.startDate) {
+                const sDate = new Date(a.startDate);
+                sDate.setHours(0,0,0,0);
+                if (sDate <= today) {
+                  needsAutoSync = true;
+                  return { ...a, status: 'มาเริ่มงาน' };
+                }
+              }
+              return a;
+            });
+
+            setApplicants(localApps);
+            setVacancies(localVacs);
+            if (needsAutoSync) syncToCloud(localApps, localVacs);
             
             const localBranches = localStorage.getItem('hr_branches');
             if (localBranches) { try { setAppBranches(JSON.parse(localBranches)); } catch(err) {} }
@@ -451,6 +506,12 @@
         e.preventDefault();
         if (!selectedTA || !addingApplicantFor) return;
         
+        // เช็คการกรอกวันเริ่มงานเมื่อสถานะเป็นรอเริ่มงาน
+        if (formData.status === 'รอเริ่มงาน' && !formData.startDate) {
+          alert('กรุณาระบุวันที่เริ่มงาน');
+          return;
+        }
+        
         const newRecord = { 
           id: Date.now().toString(), 
           ta: selectedTA, 
@@ -463,7 +524,7 @@
         
         const newApps = [newRecord, ...applicants];
         setApplicants(newApps);
-        setFormData({ name: '', phone: '', status: '', comment: '', resumeName: '', resumeBase64: '' });
+        setFormData({ name: '', phone: '', status: '', comment: '', startDate: '', resumeName: '', resumeBase64: '' });
         setAddingApplicantFor(null);
         
         syncToCloud(newApps, vacancies);
@@ -484,10 +545,17 @@
       };
 
       const saveEditApp = () => {
+        // Validation เหตุผล
         if (['อื่นๆ', 'ไม่ผ่าน', 'ไม่มาเริ่มงาน'].includes(editAppForm.status) && !editAppForm.comment) {
           alert('กรุณาระบุเหตุผลในช่องที่กำหนด');
           return;
         }
+        // Validation วันเริ่มงาน
+        if (editAppForm.status === 'รอเริ่มงาน' && !editAppForm.startDate) {
+          alert('กรุณาระบุวันที่เริ่มงาน');
+          return;
+        }
+        
         if (!['อื่นๆ', 'ไม่ผ่าน', 'ไม่มาเริ่มงาน'].includes(editAppForm.status)) {
           editAppForm.comment = '';
         }
@@ -499,10 +567,11 @@
       };
 
       const handleInlineStatusChange = (app, newStatus) => {
-        if (['อื่นๆ', 'ไม่ผ่าน', 'ไม่มาเริ่มงาน'].includes(newStatus)) {
+        // ถ้าเป็นสถานะที่ต้องการข้อมูลเพิ่มเติม ให้เปิดโหมดแก้ไข Inline
+        if (['อื่นๆ', 'ไม่ผ่าน', 'ไม่มาเริ่มงาน', 'รอเริ่มงาน'].includes(newStatus)) {
           startEditApp({ ...app, status: newStatus });
         } else {
-          const updatedApp = { ...app, status: newStatus, comment: '' };
+          const updatedApp = { ...app, status: newStatus, comment: '', startDate: '' };
           const newApps = applicants.map(a => String(a.id) === String(app.id) ? updatedApp : a);
           setApplicants(newApps);
           syncToCloud(newApps, vacancies);
@@ -600,19 +669,21 @@
       const availableBranchesForAreas = appBranches.filter(b => selectedAreas.includes(b.area));
       const filteredVacancies = vacancies.filter(v => selectedAreas.length === 0 || selectedAreas.includes(v.area));
 
+      // คำนวณ Insight ของตำแหน่งงาน (อัปเดตสถานะ "รอเริ่มงาน" เข้าไปด้วย)
       const getVacancyInsights = (branchCode, position, manualStatus, createdAt) => {
         const matchedApplicants = applicants.filter(app => String(app.branchCode) === String(branchCode) && String(app.position) === String(position));
         const applicantCount = matchedApplicants.length;
         let computedStatus = manualStatus;
         if (manualStatus !== 'Closed') {
           if (matchedApplicants.some(app => app.status === 'มาเริ่มงาน')) computedStatus = 'Hiring';
+          else if (matchedApplicants.some(app => app.status === 'รอเริ่มงาน')) computedStatus = 'รอเริ่มงาน';
           else if (matchedApplicants.some(app => app.status === 'ตรวจสุขภาพ')) computedStatus = 'รอตรวจสุขภาพ';
         }
         const slaDays = Math.max(0, Math.floor((Date.now() - createdAt) / (1000 * 60 * 60 * 24)));
         return { applicantCount, computedStatus, slaDays, matchedApplicants };
       };
 
-      // 🧠 หัวใจสำคัญ: กรองตำแหน่งงานให้ Recruit ดู (เงื่อนไข 2 ชั้น: ตำแหน่ง + Area)
+      // สำหรับแท็บ Recruit: กรองตำแหน่งงานที่ยังไม่ปิดรับ
       const activeVacanciesForRecruit = useMemo(() => {
         return vacancies.filter(v => {
           if (v.manualStatus === 'Closed') return false;
@@ -624,25 +695,21 @@
             const vacPos = String(v.position).trim();
             const vacArea = String(v.area).trim().toLowerCase();
 
-            // ค้นหากฎทั้งหมดของตำแหน่งนี้
             const posRules = appPositions.filter(p => String(p.position).trim() === vacPos);
 
             if (posRules.length > 0) {
-              // 1. ลองหาเงื่อนไขแบบ "ระบุ Area" โดยรองรับกรณีที่มีหลาย Area ในช่องเดียว (เช่น "Area 1, Area 4")
               let matchingRule = posRules.find(p => {
                 if (!p.area || String(p.area).trim() === '') return false;
                 const ruleAreas = String(p.area).split(',').map(a => a.trim().toLowerCase());
                 return ruleAreas.includes(vacArea);
               });
 
-              // 2. ถ้าไม่เจอแบบระบุ Area ให้หากฎแบบ "เว้นว่าง Area (เหมาหมด)"
               if (!matchingRule) {
                 matchingRule = posRules.find(p => !p.area || String(p.area).trim() === '');
               }
 
               if (matchingRule) {
                 const assignedRecruit = String(matchingRule.recruit).trim().toLowerCase();
-                // ถ้ามีการระบุชื่อไว้ และไม่ตรงกับ TA ปัจจุบัน ให้ซ่อนทิ้งไป
                 if (assignedRecruit !== '' && assignedRecruit !== currentTA) {
                   return false;
                 }
@@ -1104,8 +1171,14 @@
                                         <select value={editAppForm.status} onChange={e => setEditAppForm({...editAppForm, status: e.target.value})} className="w-full text-xs font-semibold border-slate-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm">
                                           {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                                         </select>
+                                        
+                                        {/* เงื่อนไขแสดงช่องกรอกวันที่เริ่มงาน */}
+                                        {editAppForm.status === 'รอเริ่มงาน' && (
+                                          <input type="date" value={editAppForm.startDate || ''} onChange={e => setEditAppForm({...editAppForm, startDate: e.target.value})} className="w-full text-xs font-semibold border-sky-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 shadow-sm mt-1" />
+                                        )}
+
                                         {['อื่นๆ', 'ไม่ผ่าน', 'ไม่มาเริ่มงาน'].includes(editAppForm.status) && (
-                                          <input value={editAppForm.comment || ''} onChange={e => setEditAppForm({...editAppForm, comment: e.target.value})} className="w-full text-xs font-semibold border-orange-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 shadow-sm" placeholder="ระบุเหตุผล..." />
+                                          <input value={editAppForm.comment || ''} onChange={e => setEditAppForm({...editAppForm, comment: e.target.value})} className="w-full text-xs font-semibold border-orange-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 shadow-sm mt-1" placeholder="ระบุเหตุผล..." />
                                         )}
                                       </td>
                                       <td className="px-3 py-3">
@@ -1150,6 +1223,8 @@
                                         {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                                       </select>
                                       {app.comment && <div className="text-xs text-slate-500 mt-1.5 max-w-[200px] truncate" title={app.comment}>เหตุผล: {app.comment}</div>}
+                                      {app.status === 'รอเริ่มงาน' && app.startDate && <div className="text-xs text-sky-600 mt-1.5 font-semibold" title="วันเริ่มงาน">📅 เริ่มงาน: {new Date(app.startDate).toLocaleDateString('th-TH')}</div>}
+                                      {app.status === 'มาเริ่มงาน' && app.startDate && <div className="text-[10px] text-emerald-600 mt-1 font-semibold">เริ่มงานแล้วเมื่อ: {new Date(app.startDate).toLocaleDateString('th-TH')}</div>}
                                     </td>
 
                                     <td className="px-6 py-4">
@@ -1210,6 +1285,15 @@
                               {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
                           </div>
+                          
+                          {/* วันเริ่มงาน จะโชว์เมื่อเลือกสถานะรอเริ่มงาน */}
+                          {formData.status === 'รอเริ่มงาน' && (
+                            <div className="md:col-span-2 bg-sky-50/50 p-5 rounded-xl border border-sky-100 animate-in fade-in duration-300">
+                              <label className="text-sm font-semibold text-sky-800 mb-2 block">ระบุวันที่เริ่มงาน <span className="text-red-500">*</span></label>
+                              <input required type="date" name="startDate" value={formData.startDate || ''} onChange={handleInputChange} className="w-full border border-sky-200 rounded-xl px-4 py-3 outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-500/10" />
+                            </div>
+                          )}
+
                         </div>
 
                         {/* UPLOAD RESUME */}
@@ -1487,6 +1571,8 @@
                            </div>
                            <div className="text-right shrink-0">
                              <span className="inline-block px-2.5 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: `${STATUS_COLORS[app.status]}15`, color: STATUS_COLORS[app.status] }}>{app.status}</span>
+                             {app.status === 'รอเริ่มงาน' && app.startDate && <div className="text-[10px] text-sky-600 mt-1 font-semibold">เริ่มงาน: {new Date(app.startDate).toLocaleDateString('th-TH')}</div>}
+                             {app.status === 'มาเริ่มงาน' && app.startDate && <div className="text-[10px] text-emerald-600 mt-1 font-semibold">เริ่มงานเมื่อ: {new Date(app.startDate).toLocaleDateString('th-TH')}</div>}
                              <p className="text-[10px] text-slate-400 mt-1">โดย {app.ta}</p>
                            </div>
                          </div>
