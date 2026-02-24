@@ -759,7 +759,22 @@
                               {app.comment && <div className="text-xs text-slate-500 mt-1 max-w-[200px] truncate">เหตุผล: {app.comment}</div>}
                             </td>
                             <td className="px-6 py-4">
-                              {app.resumeName ? <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md border flex w-fit items-center"><Paperclip size={12} className="mr-1"/> มีไฟล์</span> : <span className="text-xs text-slate-400">-</span>}
+                              {/* ส่วนแก้ไขให้ไฟล์แนบสามารถกดเปิดดูหรือดาวน์โหลดได้ */}
+                              {app.resumeBase64 ? (
+                                <a 
+                                  href={app.resumeBase64} 
+                                  download={app.resumeName}
+                                  className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1.5 rounded-md border border-blue-200 flex w-fit items-center hover:bg-blue-600 hover:text-white transition-colors shadow-sm cursor-pointer"
+                                  title={`คลิกเพื่อดาวน์โหลด: ${app.resumeName}`}
+                                >
+                                  <Paperclip size={12} className="mr-1.5"/> 
+                                  {app.resumeName.length > 12 ? app.resumeName.substring(0, 12) + '...' : app.resumeName}
+                                </a>
+                              ) : app.resumeName ? (
+                                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md border flex w-fit items-center"><Paperclip size={12} className="mr-1"/> มีไฟล์</span>
+                              ) : (
+                                <span className="text-xs text-slate-400">-</span>
+                              )}
                             </td>
                             <td className="px-6 py-4 text-right">
                               <div className="flex items-center justify-end space-x-2">
