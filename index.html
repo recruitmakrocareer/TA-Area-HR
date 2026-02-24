@@ -33,7 +33,7 @@
     import React, { useState, useMemo, useEffect } from 'https://esm.sh/react@18.2.0';
     import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
     import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'https://esm.sh/recharts@2.12.0?deps=react@18.2.0,react-dom@18.2.0';
-    import { Users, UserPlus, BarChart3, Building2, CheckCircle2, Clock, MapPin, Search, AlertCircle, FileText, Briefcase, Phone, MessageSquare, Map, Target, Edit, Trash2, X, BellRing, Download, Paperclip, Upload, Eye } from 'https://esm.sh/lucide-react@0.344.0?deps=react@18.2.0';
+    import { Users, UserPlus, BarChart3, Building2, CheckCircle2, Clock, MapPin, Search, AlertCircle, FileText, Briefcase, Phone, MessageSquare, Map, Target, Edit, Trash2, X, BellRing, Download, Paperclip, Upload, Eye, PlusCircle } from 'https://esm.sh/lucide-react@0.344.0?deps=react@18.2.0';
 
     // ==========================================
     // ⚙️ การตั้งค่า GOOGLE SHEETS API
@@ -111,8 +111,10 @@
       
       // --- STATE: HR Recruit ---
       const [selectedTA, setSelectedTA] = useState('');
-      const [selectedBranchCode, setSelectedBranchCode] = useState('');
-      const [formData, setFormData] = useState({ name: '', phone: '', position: '', status: '', comment: '', resumeName: '', resumeBase64: '' });
+      const [recruitAreaFilter, setRecruitAreaFilter] = useState('');
+      const [recruitBranchFilter, setRecruitBranchFilter] = useState('');
+      const [addingApplicantFor, setAddingApplicantFor] = useState(null); // Modal สำหรับเพิ่มผู้สมัคร
+      const [formData, setFormData] = useState({ name: '', phone: '', status: '', comment: '', resumeName: '', resumeBase64: '' });
       const [editingApplicant, setEditingApplicant] = useState(null);
       const [applicants, setApplicants] = useState([]);
 
@@ -228,7 +230,6 @@
             const data = XLSX.utils.sheet_to_json(wb.Sheets[wsname], { header: 1 });
             
             const newTAs = [];
-            // วนลูปอ่านข้อมูล (สมมติว่าคอลัมน์แรกคือชื่อ TA และข้ามแถวแรกที่เป็นหัวข้อ)
             for (let i = 1; i < data.length; i++) {
               const row = data[i];
               if (row && row[0]) {
@@ -264,7 +265,6 @@
             const data = XLSX.utils.sheet_to_json(wb.Sheets[wsname], { header: 1 });
             
             const newPositions = [];
-            // วนลูปอ่านข้อมูลตำแหน่งจากคอลัมน์แรก
             for (let i = 1; i < data.length; i++) {
               const row = data[i];
               if (row && row[0]) {
@@ -297,7 +297,6 @@
       };
 
       // --- HANDLERS: HR Recruit ---
-      const handleBranchChange = (e) => setSelectedBranchCode(e.target.value);
       const handleInputChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
       
       const handleFileUpload = (e) => {
@@ -313,12 +312,21 @@
       
       const handleRecruitSubmit = async (e) => {
         e.preventDefault();
-        if (!selectedTA || !selectedBranchCode) { alert('กรุณาเลือก TA และ สาขาก่อนบันทึกข้อมูล'); return; }
-        const branch = appBranches.find(b => b.code === selectedBranchCode);
-        const newRecord = { id: Date.now(), ta: selectedTA, branchCode: branch.code, branchName: branch.name, ...formData, timestamp: new Date().toLocaleString('th-TH') };
+        if (!selectedTA || !addingApplicantFor) return;
+        
+        const newRecord = { 
+          id: Date.now(), 
+          ta: selectedTA, 
+          branchCode: addingApplicantFor.branchCode, 
+          branchName: addingApplicantFor.branchName, 
+          position: addingApplicantFor.position,
+          ...formData, 
+          timestamp: new Date().toLocaleString('th-TH') 
+        };
         
         setApplicants([newRecord, ...applicants]);
-        setFormData({ name: '', phone: '', position: '', status: '', comment: '', resumeName: '', resumeBase64: '' });
+        setFormData({ name: '', phone: '', status: '', comment: '', resumeName: '', resumeBase64: '' });
+        setAddingApplicantFor(null); // ปิด Modal
         
         if (GOOGLE_SCRIPT_URL) {
           try {
@@ -396,8 +404,21 @@
         return { applicantCount, computedStatus, slaDays, matchedApplicants };
       };
 
-      const selectedBranch = appBranches.find(b => b.code === selectedBranchCode);
-      const filteredEntryList = applicants.filter(app => (!selectedTA || app.ta === selectedTA) && (!selectedBranchCode || app.branchCode === selectedBranchCode));
+      // สำหรับแท็บ Recruit: กรองตำแหน่งงานที่ยังไม่ปิดรับ (เพื่อให้ Recruit เลือกเพิ่มคน)
+      const activeVacanciesForRecruit = useMemo(() => {
+        return vacancies.filter(v => {
+          if (v.manualStatus === 'Closed') return false;
+          if (recruitAreaFilter && v.area !== recruitAreaFilter) return false;
+          if (recruitBranchFilter && v.branchCode !== recruitBranchFilter) return false;
+          return true;
+        });
+      }, [vacancies, recruitAreaFilter, recruitBranchFilter]);
+
+      const branchesForRecruitFilter = appBranches.filter(b => !recruitAreaFilter || b.area === recruitAreaFilter);
+      
+      // ประวัติของ TA ปัจจุบัน
+      const myApplicants = applicants.filter(app => app.ta === selectedTA);
+
       const dashboardData = useMemo(() => dashboardTA === 'ALL' ? applicants : applicants.filter(app => app.ta === dashboardTA), [applicants, dashboardTA]);
       
       const statusChartData = useMemo(() => {
@@ -410,16 +431,14 @@
         return Object.keys(counts).map(key => ({ name: key, count: counts[key] })).sort((a, b) => b.count - a.count);
       }, [dashboardData]);
 
-      // สร้างข้อมูลสำหรับกราฟ SLA (นับอายุของตำแหน่งงาน)
+      // สร้างข้อมูลสำหรับกราฟ SLA
       const slaChartData = useMemo(() => {
         const buckets = [
-          { name: '0-14 วัน', count: 0, fill: '#10B981' }, // เขียว (อยู่ในเกณฑ์)
-          { name: '15-30 วัน', count: 0, fill: '#F59E0B' }, // เหลือง (เริ่มช้า)
-          { name: '31-45 วัน', count: 0, fill: '#F97316' }, // ส้ม (ช้ามาก)
-          { name: 'เกิน 45 วัน', count: 0, fill: '#EF4444' }  // แดง (เกินกำหนด)
+          { name: '0-14 วัน', count: 0, fill: '#10B981' }, 
+          { name: '15-30 วัน', count: 0, fill: '#F59E0B' }, 
+          { name: '31-45 วัน', count: 0, fill: '#F97316' }, 
+          { name: 'เกิน 45 วัน', count: 0, fill: '#EF4444' } 
         ];
-        
-        // กรองเฉพาะตำแหน่งที่ยังไม่ปิดรับ เพื่อดู SLA ปัจจุบัน
         vacancies.forEach(v => {
           if (v.manualStatus !== 'Closed') {
             const slaDays = Math.max(0, Math.floor((Date.now() - v.createdAt) / (1000 * 60 * 60 * 24)));
@@ -496,7 +515,7 @@
             {activeTab === 'area_hr' && (
               <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500 relative">
                 
-                {/* Area Select (Improved Grid Layout) */}
+                {/* Area Select */}
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8">
                   <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
@@ -510,7 +529,6 @@
                     </div>
                   </div>
                   
-                  {/* BEAUTIFUL GRID LAYOUT FOR AREAS */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
                     {appAreas.map(area => {
                       const isSelected = selectedAreas.includes(area);
@@ -582,7 +600,6 @@
                         <span className="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-2 rounded-lg border border-slate-200">
                           ทั้งหมด <span className="text-blue-600 text-sm mx-1">{filteredVacancies.length}</span> รายการ
                         </span>
-                        {/* EXPORT BUTTON */}
                         <button onClick={() => exportToExcel(filteredVacancies, 'Vacancies_Export')} className="flex items-center space-x-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 text-xs font-bold px-3 py-2 rounded-lg transition-colors shadow-sm">
                           <Download size={14} /><span>Export Excel</span>
                         </button>
@@ -684,142 +701,212 @@
             {activeTab === 'entry' && (
               <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
                 
+                {/* 1. TA Selection */}
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8">
                   <div className="mb-6">
-                    <h2 className="text-lg font-bold text-slate-900 flex items-center space-x-2"><MapPin className="text-blue-600" size={22} /><span>ส่วนงานรับผิดชอบ</span></h2>
+                    <h2 className="text-lg font-bold text-slate-900 flex items-center space-x-2"><UserPlus className="text-blue-600" size={22} /><span>ส่วนงานรับผิดชอบ (Recruiter)</span></h2>
+                    <p className="text-sm text-slate-500 mt-1 ml-7">กรุณาระบุชื่อ TA ของคุณ เพื่อเรียกดูและเพิ่มผู้สมัครเข้าสู่ตำแหน่งงานที่กำลังเปิดรับ</p>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">ชื่อผู้รับผิดชอบ (TA) <span className="text-red-500">*</span></label>
-                      <select value={selectedTA} onChange={(e) => setSelectedTA(e.target.value)} className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none shadow-sm">
-                        <option value="">-- ระบุ TA --</option>
-                        {appTAs.map(ta => <option key={ta} value={ta}>{ta}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">สาขาที่สมัคร <span className="text-red-500">*</span></label>
-                      <select value={selectedBranchCode} onChange={handleBranchChange} disabled={!selectedTA} className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 shadow-sm disabled:bg-slate-50 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none">
-                        <option value="">-- เลือกรหัส - ชื่อสาขา --</option>
-                        {appBranches.map(branch => <option key={branch.code} value={branch.code}>[{branch.area}] {branch.code} - {branch.name}</option>)}
-                      </select>
-                    </div>
+                  <div className="max-w-md ml-0 md:ml-7">
+                    <label className="block text-sm font-semibold text-slate-700 mb-2">ชื่อผู้รับผิดชอบ (TA) <span className="text-red-500">*</span></label>
+                    <select value={selectedTA} onChange={(e) => setSelectedTA(e.target.value)} className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none shadow-sm">
+                      <option value="">-- ระบุ TA --</option>
+                      {appTAs.map(ta => <option key={ta} value={ta}>{ta}</option>)}
+                    </select>
                   </div>
                 </div>
 
-                {selectedTA && selectedBranchCode && (
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="bg-slate-50/50 border-b border-slate-100 px-6 py-5 flex items-center space-x-3">
-                      <div className="bg-blue-100 text-blue-600 p-2 rounded-lg"><FileText size={20} strokeWidth={2} /></div>
-                      <h2 className="text-lg font-bold text-slate-900">ฟอร์มบันทึกผู้สมัครใหม่</h2>
+                {selectedTA && (
+                  <>
+                    {/* 2. Vacancies List for Recruiter */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                      <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/50">
+                        <div>
+                          <h3 className="font-bold text-slate-900 text-lg flex items-center space-x-2">
+                            <Target className="text-blue-600" size={20} />
+                            <span>ตำแหน่งงานที่กำลังเปิดรับ (Active Vacancies)</span>
+                          </h3>
+                          <p className="text-sm text-slate-500 mt-1 ml-7">เลือก "เพิ่มผู้สมัคร" ในตำแหน่งงานที่ต้องการ</p>
+                        </div>
+                        
+                        {/* Filters for Recruit Table */}
+                        <div className="flex items-center space-x-3 w-full md:w-auto">
+                          <select value={recruitAreaFilter} onChange={(e) => { setRecruitAreaFilter(e.target.value); setRecruitBranchFilter(''); }} className="w-full md:w-32 bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                            <option value="">ทุก Area</option>
+                            {appAreas.map(area => <option key={area} value={area}>{area}</option>)}
+                          </select>
+                          <select value={recruitBranchFilter} onChange={(e) => setRecruitBranchFilter(e.target.value)} className="w-full md:w-48 bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500" disabled={!recruitAreaFilter}>
+                            <option value="">ทุกสาขา</option>
+                            {branchesForRecruitFilter.map(b => <option key={b.code} value={b.code}>{b.name}</option>)}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left whitespace-nowrap">
+                          <thead className="bg-white border-b border-slate-100">
+                            <tr>
+                              <th className="px-6 py-3.5 font-semibold text-slate-600 uppercase text-xs">Area / สาขา</th>
+                              <th className="px-6 py-3.5 font-semibold text-slate-600 uppercase text-xs">ตำแหน่งที่เปิดรับ</th>
+                              <th className="px-6 py-3.5 font-semibold text-slate-600 uppercase text-xs text-center">ยอดรับสมัครแล้ว</th>
+                              <th className="px-6 py-3.5 font-semibold text-slate-600 uppercase text-xs text-center">สถานะตำแหน่ง</th>
+                              <th className="px-6 py-3.5 font-semibold text-slate-600 uppercase text-xs text-right">ดำเนินการ</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-50">
+                            {activeVacanciesForRecruit.length === 0 ? (
+                              <tr><td colSpan="5" className="px-6 py-12 text-center text-slate-400">ไม่มีตำแหน่งงานว่างที่ตรงกับเงื่อนไขการค้นหา หรือยังไม่มีการเปิดรับตำแหน่งจาก Area HR</td></tr>
+                            ) : (
+                              activeVacanciesForRecruit.map(v => {
+                                const { applicantCount, computedStatus } = getVacancyInsights(v.branchCode, v.position, v.manualStatus, v.createdAt);
+                                return (
+                                  <tr key={v.id} className="hover:bg-blue-50/30 transition-colors group">
+                                    <td className="px-6 py-4">
+                                      <div className="text-xs font-bold text-blue-600 mb-0.5">{v.area}</div>
+                                      <div className="font-semibold text-slate-900">{v.branchName}</div>
+                                    </td>
+                                    <td className="px-6 py-4 font-bold text-slate-800">{v.position}</td>
+                                    <td className="px-6 py-4 text-center">
+                                      <span className={`inline-flex items-center justify-center min-w-[32px] h-8 rounded-lg font-bold text-sm border ${applicantCount > 0 ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
+                                        {applicantCount}
+                                      </span>
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                      <div className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: `${VACANCY_COLORS[computedStatus] || '#475569'}15`, color: VACANCY_COLORS[computedStatus] || '#475569', border: `1px solid ${VACANCY_COLORS[computedStatus] || '#475569'}30` }}>
+                                        {computedStatus}
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                      <button 
+                                        onClick={() => setAddingApplicantFor(v)}
+                                        className="inline-flex items-center space-x-1.5 bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-xl text-sm font-semibold transition-colors shadow-sm"
+                                      >
+                                        <PlusCircle size={16} />
+                                        <span>เพิ่มผู้สมัคร</span>
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
-                    <form onSubmit={handleRecruitSubmit} className="p-6 md:p-8 space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                        <div><label className="text-sm font-semibold mb-2 block">1. ชื่อ-นามสกุล <span className="text-red-500">*</span></label><input required type="text" name="name" value={formData.name} onChange={handleInputChange} className="w-full border border-slate-300 rounded-xl px-4 py-2.5 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"/></div>
-                        <div><label className="text-sm font-semibold mb-2 block">2. เบอร์ติดต่อ <span className="text-red-500">*</span></label><input required type="tel" name="phone" value={formData.phone} onChange={handleInputChange} className="w-full border border-slate-300 rounded-xl px-4 py-2.5 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"/></div>
-                        <div>
-                          <label className="text-sm font-semibold mb-2 block">3. ตำแหน่งงาน <span className="text-red-500">*</span></label>
-                          <select required name="position" value={formData.position} onChange={handleInputChange} className="w-full border border-slate-300 rounded-xl px-4 py-2.5 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10">
-                            <option value="">-- เลือกตำแหน่งงาน --</option>
-                            {appPositions.map(pos => <option key={pos} value={pos}>{pos}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-sm font-semibold mb-2 block">4. สถานะผู้สมัคร <span className="text-red-500">*</span></label>
-                          <select required name="status" value={formData.status} onChange={handleInputChange} className="w-full border border-slate-300 rounded-xl px-4 py-2.5 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10">
-                            <option value="">-- เลือกสถานะล่าสุด --</option>
-                            {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                          </select>
-                        </div>
-                      </div>
 
-                      {/* UPLOAD RESUME */}
-                      <div>
-                        <label className="text-sm font-semibold mb-2 block">5. อัปโหลดเรซูเม่ (ไม่บังคับ)</label>
-                        <div className="flex items-center space-x-2">
-                           <label className="flex items-center justify-center w-full bg-white border border-slate-300 border-dashed rounded-xl px-4 py-3 hover:bg-slate-50 hover:border-blue-400 cursor-pointer transition-colors shadow-sm">
-                              <Paperclip size={18} className="text-blue-500 mr-2" />
-                              <span className="text-sm text-slate-600 font-medium">{formData.resumeName || 'คลิกเพื่อเลือกไฟล์ (PDF, DOC, รูปภาพ)'}</span>
-                              <input type="file" className="hidden" accept=".pdf,.doc,.docx,image/*" onChange={handleFileUpload} />
-                           </label>
-                           {formData.resumeName && (
-                             <button type="button" onClick={() => setFormData(prev => ({...prev, resumeName:'', resumeBase64:''}))} className="p-3 rounded-xl bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
-                               <X size={18}/>
-                             </button>
-                           )}
-                        </div>
-                      </div>
-
-                      {['อื่นๆ', 'ไม่ผ่าน', 'ไม่มาเริ่มงาน'].includes(formData.status) && (
-                        <div className="bg-orange-50/50 p-5 rounded-xl border border-orange-100 animate-in fade-in duration-300">
-                          <label className="text-sm font-semibold text-orange-800 mb-2 block">ระบุเหตุผล <span className="text-red-500">*</span></label>
-                          <textarea required name="comment" value={formData.comment} onChange={handleInputChange} rows="2" className="w-full border border-orange-200 rounded-xl px-4 py-3 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-500/10"></textarea>
-                        </div>
-                      )}
-                      
-                      <div className="pt-4 border-t flex justify-end">
-                        <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-8 rounded-xl font-semibold shadow-sm flex items-center space-x-2 transition-all active:scale-95">
-                          <UserPlus size={18} /><span>บันทึกข้อมูลผู้สมัคร</span>
+                    {/* 3. My Applicant History */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 mt-8">
+                      <div className="px-6 py-5 border-b flex justify-between items-center flex-wrap gap-4">
+                        <h3 className="font-bold text-slate-900 text-lg">ประวัติการบันทึกผู้สมัครล่าสุดของคุณ</h3>
+                        <button onClick={() => exportToExcel(myApplicants, 'My_Applicants_Export')} className="flex items-center space-x-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 text-xs font-bold px-3 py-2 rounded-lg transition-colors shadow-sm">
+                          <Download size={14} /><span>Export Excel</span>
                         </button>
                       </div>
-                    </form>
-                  </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left whitespace-nowrap"><thead className="bg-slate-50"><tr><th className="px-6 py-3">สาขา</th><th className="px-6 py-3">ชื่อ-นามสกุล / ตำแหน่ง</th><th className="px-6 py-3">สถานะปัจจุบัน</th><th className="px-6 py-3">ไฟล์แนบ</th><th className="px-6 py-3 text-right">จัดการ</th></tr></thead>
+                        <tbody>
+                          {myApplicants.length === 0 ? (
+                            <tr><td colSpan="5" className="px-6 py-8 text-center text-slate-400">คุณยังไม่มีประวัติการเพิ่มผู้สมัคร</td></tr>
+                          ) : (
+                            myApplicants.map(app => (
+                            <tr key={app.id} className="border-t hover:bg-slate-50">
+                              <td className="px-6 py-4">
+                                <div className="font-semibold text-slate-800">{app.branchName}</div>
+                                <div className="text-xs text-slate-400">{app.branchCode}</div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="font-bold text-slate-900">{app.name}</div>
+                                <div className="text-sm text-slate-600 mt-0.5">{app.position} • {app.phone}</div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className="px-2.5 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: `${STATUS_COLORS[app.status]}15`, color: STATUS_COLORS[app.status] }}>{app.status}</span>
+                                {app.comment && <div className="text-xs text-slate-500 mt-1 max-w-[200px] truncate">เหตุผล: {app.comment}</div>}
+                              </td>
+                              <td className="px-6 py-4">
+                                {app.resumeBase64 ? (
+                                  <div className="flex items-center space-x-2">
+                                    <button onClick={() => setPreviewFile({ base64: app.resumeBase64, name: app.resumeName })} className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1.5 rounded-md border border-blue-200 flex items-center hover:bg-blue-600 hover:text-white transition-colors shadow-sm cursor-pointer" title="ดูตัวอย่าง">
+                                      <Eye size={12} className="mr-1.5"/> Preview
+                                    </button>
+                                  </div>
+                                ) : app.resumeName ? (
+                                  <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md border flex w-fit items-center"><Paperclip size={12} className="mr-1"/> มีไฟล์</span>
+                                ) : (
+                                  <span className="text-xs text-slate-400">-</span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                <div className="flex items-center justify-end space-x-2">
+                                  <button onClick={() => setEditingApplicant(app)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="แก้ไข"><Edit size={16} /></button>
+                                  <button onClick={() => deleteApplicant(app.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="ลบ"><Trash2 size={16} /></button>
+                                </div>
+                              </td>
+                            </tr>
+                          )))}
+                        </tbody></table>
+                      </div>
+                    </div>
+                  </>
                 )}
 
-                {selectedBranchCode && (
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 mt-8">
-                    <div className="px-6 py-5 border-b flex justify-between items-center flex-wrap gap-4">
-                      <h3 className="font-bold text-lg">ประวัติการบันทึก</h3>
-                      {/* EXPORT BUTTON */}
-                      <button onClick={() => exportToExcel(filteredEntryList, 'Applicants_Export')} className="flex items-center space-x-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 text-xs font-bold px-3 py-2 rounded-lg transition-colors shadow-sm">
-                        <Download size={14} /><span>Export Excel</span>
-                      </button>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm text-left whitespace-nowrap"><thead className="bg-slate-50"><tr><th className="px-6 py-3">ชื่อ-นามสกุล</th><th className="px-6 py-3">ตำแหน่งงาน</th><th className="px-6 py-3">สถานะปัจจุบัน</th><th className="px-6 py-3">ไฟล์แนบ</th><th className="px-6 py-3 text-right">จัดการ</th></tr></thead>
-                      <tbody>
-                        {filteredEntryList.map(app => (
-                          <tr key={app.id} className="border-t hover:bg-slate-50">
-                            <td className="px-6 py-4 font-semibold">{app.name}</td>
-                            <td className="px-6 py-4">{app.position}</td>
-                            <td className="px-6 py-4">
-                              <span className="px-2.5 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: `${STATUS_COLORS[app.status]}15`, color: STATUS_COLORS[app.status] }}>{app.status}</span>
-                              {app.comment && <div className="text-xs text-slate-500 mt-1 max-w-[200px] truncate">เหตุผล: {app.comment}</div>}
-                            </td>
-                            <td className="px-6 py-4">
-                              {/* Preview File Button Update */}
-                              {app.resumeBase64 ? (
-                                <div className="flex items-center space-x-2">
-                                  <button 
-                                    onClick={() => setPreviewFile({ base64: app.resumeBase64, name: app.resumeName })}
-                                    className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1.5 rounded-md border border-blue-200 flex items-center hover:bg-blue-600 hover:text-white transition-colors shadow-sm cursor-pointer"
-                                    title="ดูตัวอย่าง"
-                                  >
-                                    <Eye size={12} className="mr-1.5"/> Preview
-                                  </button>
-                                  <a 
-                                    href={app.resumeBase64} 
-                                    download={app.resumeName}
-                                    className="text-slate-400 hover:text-blue-600 transition-colors"
-                                    title={`ดาวน์โหลด: ${app.resumeName}`}
-                                  >
-                                    <Download size={16}/>
-                                  </a>
-                                </div>
-                              ) : app.resumeName ? (
-                                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md border flex w-fit items-center"><Paperclip size={12} className="mr-1"/> มีไฟล์</span>
-                              ) : (
-                                <span className="text-xs text-slate-400">-</span>
-                              )}
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                              <div className="flex items-center justify-end space-x-2">
-                                <button onClick={() => setEditingApplicant(app)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="แก้ไข"><Edit size={16} /></button>
-                                <button onClick={() => deleteApplicant(app.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="ลบ"><Trash2 size={16} /></button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody></table>
+                {/* Modal: เพิ่มข้อมูลผู้สมัคร สำหรับตำแหน่งที่เลือก */}
+                {addingApplicantFor && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden">
+                      <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-blue-600 text-white">
+                        <div>
+                          <h3 className="font-bold text-lg flex items-center space-x-2">
+                            <UserPlus size={20} /><span>เพิ่มข้อมูลผู้สมัครใหม่</span>
+                          </h3>
+                          <p className="text-blue-100 text-sm mt-1">ตำแหน่ง: {addingApplicantFor.position} • {addingApplicantFor.branchName}</p>
+                        </div>
+                        <button onClick={() => setAddingApplicantFor(null)} className="p-2 text-blue-200 hover:bg-blue-500 hover:text-white rounded-full transition-colors"><X size={20} /></button>
+                      </div>
+                      <form onSubmit={handleRecruitSubmit} className="p-6 md:p-8 space-y-6 max-h-[70vh] overflow-y-auto">
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                          <div><label className="text-sm font-semibold mb-2 block">ชื่อ-นามสกุล <span className="text-red-500">*</span></label><input required type="text" name="name" value={formData.name} onChange={handleInputChange} className="w-full border border-slate-300 rounded-xl px-4 py-2.5 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"/></div>
+                          <div><label className="text-sm font-semibold mb-2 block">เบอร์ติดต่อ <span className="text-red-500">*</span></label><input required type="tel" name="phone" value={formData.phone} onChange={handleInputChange} className="w-full border border-slate-300 rounded-xl px-4 py-2.5 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"/></div>
+                          <div className="md:col-span-2">
+                            <label className="text-sm font-semibold mb-2 block">สถานะผู้สมัคร <span className="text-red-500">*</span></label>
+                            <select required name="status" value={formData.status} onChange={handleInputChange} className="w-full border border-slate-300 rounded-xl px-4 py-2.5 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10">
+                              <option value="">-- เลือกสถานะปัจจุบัน --</option>
+                              {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* UPLOAD RESUME */}
+                        <div>
+                          <label className="text-sm font-semibold mb-2 block">อัปโหลดเรซูเม่ (ไม่บังคับ)</label>
+                          <div className="flex items-center space-x-2">
+                             <label className="flex items-center justify-center w-full bg-white border border-slate-300 border-dashed rounded-xl px-4 py-4 hover:bg-slate-50 hover:border-blue-400 cursor-pointer transition-colors shadow-sm">
+                                <Upload size={18} className="text-blue-500 mr-2" />
+                                <span className="text-sm text-slate-600 font-medium">{formData.resumeName || 'คลิกเพื่อเลือกไฟล์ (PDF, DOC, รูปภาพ)'}</span>
+                                <input type="file" className="hidden" accept=".pdf,.doc,.docx,image/*" onChange={handleFileUpload} />
+                             </label>
+                             {formData.resumeName && (
+                               <button type="button" onClick={() => setFormData(prev => ({...prev, resumeName:'', resumeBase64:''}))} className="p-4 rounded-xl bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
+                                 <X size={20}/>
+                               </button>
+                             )}
+                          </div>
+                        </div>
+
+                        {['อื่นๆ', 'ไม่ผ่าน', 'ไม่มาเริ่มงาน'].includes(formData.status) && (
+                          <div className="bg-orange-50/50 p-5 rounded-xl border border-orange-100 animate-in fade-in duration-300">
+                            <label className="text-sm font-semibold text-orange-800 mb-2 block">ระบุเหตุผล / รายละเอียด <span className="text-red-500">*</span></label>
+                            <textarea required name="comment" value={formData.comment} onChange={handleInputChange} rows="2" className="w-full border border-orange-200 rounded-xl px-4 py-3 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-500/10"></textarea>
+                          </div>
+                        )}
+                        
+                        <div className="pt-6 border-t flex justify-end space-x-3">
+                          <button type="button" onClick={() => setAddingApplicantFor(null)} className="px-6 py-3 rounded-xl font-semibold text-slate-600 hover:bg-slate-100 transition-colors">ยกเลิก</button>
+                          <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-8 rounded-xl font-semibold shadow-sm flex items-center space-x-2 transition-all active:scale-95">
+                            <CheckCircle2 size={18} /><span>บันทึกข้อมูล</span>
+                          </button>
+                        </div>
+                      </form>
                     </div>
                   </div>
                 )}
@@ -974,7 +1061,7 @@
                </div>
             )}
 
-            {/* Modals for Edit/View ... */}
+            {/* Modals for Edit ... */}
             {editingVacancy && (
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
                 <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
@@ -1025,9 +1112,8 @@
                     </div>
                     <div>
                         <label className="block text-sm font-semibold mb-2">ตำแหน่งงาน</label>
-                        <select required value={editingApplicant.position} onChange={(e) => setEditingApplicant({...editingApplicant, position: e.target.value})} className="w-full border rounded-xl px-4 py-2.5 outline-none focus:border-blue-500">
-                          <option value="">-- เลือกตำแหน่งงาน --</option>
-                          {appPositions.map(pos => <option key={pos} value={pos}>{pos}</option>)}
+                        <select required value={editingApplicant.position} onChange={(e) => setEditingApplicant({...editingApplicant, position: e.target.value})} className="w-full border rounded-xl px-4 py-2.5 outline-none focus:border-blue-500" disabled>
+                          <option value="">{editingApplicant.position}</option>
                         </select>
                     </div>
                     <div>
