@@ -443,7 +443,23 @@
         const newVacs = [newVacancy, ...vacancies];
         setVacancies(newVacs);
         setVacancyForm({ branchCode: '', position: '', manualStatus: 'Vacant' });
+        
+        // 1. ซิงค์ข้อมูลขึ้นชีต
         syncToCloud(applicants, newVacs);
+
+        // 2. ส่งคำสั่งให้ยิงอีเมลแจ้งเตือน
+        if (GOOGLE_SCRIPT_URL) {
+          try {
+            fetch(GOOGLE_SCRIPT_URL, {
+              method: 'POST',
+              mode: 'no-cors',
+              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify({ action: 'notifyNewVacancy', vacancy: newVacancy })
+            });
+          } catch (error) {
+            console.error('Email Notification Error:', error);
+          }
+        }
       };
 
       const deleteVacancy = (id) => {
