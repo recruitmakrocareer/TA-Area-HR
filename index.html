@@ -399,14 +399,38 @@
       const selectedBranch = appBranches.find(b => b.code === selectedBranchCode);
       const filteredEntryList = applicants.filter(app => (!selectedTA || app.ta === selectedTA) && (!selectedBranchCode || app.branchCode === selectedBranchCode));
       const dashboardData = useMemo(() => dashboardTA === 'ALL' ? applicants : applicants.filter(app => app.ta === dashboardTA), [applicants, dashboardTA]);
+      
       const statusChartData = useMemo(() => {
         const counts = {}; dashboardData.forEach(app => counts[app.status] = (counts[app.status] || 0) + 1);
         return Object.keys(counts).map(key => ({ name: key, value: counts[key] })).sort((a, b) => b.value - a.value);
       }, [dashboardData]);
+      
       const branchChartData = useMemo(() => {
         const counts = {}; dashboardData.forEach(app => counts[app.branchName] = (counts[app.branchName] || 0) + 1);
         return Object.keys(counts).map(key => ({ name: key, count: counts[key] })).sort((a, b) => b.count - a.count);
       }, [dashboardData]);
+
+      // สร้างข้อมูลสำหรับกราฟ SLA (นับอายุของตำแหน่งงาน)
+      const slaChartData = useMemo(() => {
+        const buckets = [
+          { name: '0-14 วัน', count: 0, fill: '#10B981' }, // เขียว (อยู่ในเกณฑ์)
+          { name: '15-30 วัน', count: 0, fill: '#F59E0B' }, // เหลือง (เริ่มช้า)
+          { name: '31-45 วัน', count: 0, fill: '#F97316' }, // ส้ม (ช้ามาก)
+          { name: 'เกิน 45 วัน', count: 0, fill: '#EF4444' }  // แดง (เกินกำหนด)
+        ];
+        
+        // กรองเฉพาะตำแหน่งที่ยังไม่ปิดรับ เพื่อดู SLA ปัจจุบัน
+        vacancies.forEach(v => {
+          if (v.manualStatus !== 'Closed') {
+            const slaDays = Math.max(0, Math.floor((Date.now() - v.createdAt) / (1000 * 60 * 60 * 24)));
+            if (slaDays <= 14) buckets[0].count++;
+            else if (slaDays <= 30) buckets[1].count++;
+            else if (slaDays <= 45) buckets[2].count++;
+            else buckets[3].count++;
+          }
+        });
+        return buckets;
+      }, [vacancies]);
 
 
       // --- COMPONENTS ---
@@ -919,6 +943,33 @@
                        </ResponsiveContainer>
                      </div>
                    </div>
+                   
+                   {/* กราฟ SLA เพิ่มเติม */}
+                   <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col lg:col-span-2">
+                     <div className="mb-6 flex items-center justify-between">
+                       <div>
+                         <h3 className="font-bold text-lg text-slate-900">อายุของตำแหน่งงานว่าง (Vacancy SLA Aging)</h3>
+                         <p className="text-sm text-slate-500 mt-1">จำนวนตำแหน่งงานที่ยังเปิดรับ แยกตามระยะเวลาตั้งแต่เริ่มเปิด (วัน)</p>
+                       </div>
+                       <div className="p-2 bg-rose-50 text-rose-600 rounded-xl"><Clock size={20} /></div>
+                     </div>
+                     <div className="flex-1 min-h-[300px]">
+                       <ResponsiveContainer width="100%" height="100%">
+                         <BarChart data={slaChartData} margin={{ top: 10, bottom: 0, left: -20, right: 10 }}>
+                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                           <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#64748B', fontWeight: 600}} dy={10} />
+                           <YAxis axisLine={false} tickLine={false} tick={{fontSize: 11, fill: '#94A3B8', fontWeight: 500}} allowDecimals={false} />
+                           <RechartsTooltip cursor={{ fill: '#F8FAFC' }} contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontWeight: 600 }} />
+                           <Bar dataKey="count" name="จำนวนตำแหน่ง (งาน)" radius={[6,6,0,0]} barSize={50}>
+                             {slaChartData.map((entry, index) => (
+                               <Cell key={`cell-${index}`} fill={entry.fill} />
+                             ))}
+                           </Bar>
+                         </BarChart>
+                       </ResponsiveContainer>
+                     </div>
+                   </div>
+
                  </div>
                </div>
             )}
