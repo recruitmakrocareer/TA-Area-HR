@@ -37,7 +37,7 @@
     // ⚙️ การตั้งค่า GOOGLE SHEETS API
     // นำ Web App URL ของ Google Apps Script มาวางที่นี่
     // ==========================================
-    const GOOGLE_SCRIPT_URL = ""; 
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwKUyZOjJ59YufdzNsGoah5GjiuD64oaRu3sgQob8NRVE3v485KAHQulXyqzx3ME1kVqQ/exec"; 
 
     // --- MOCK DATA (Fallback) ---
     const TA_LIST = ['TA 1 (คุณเอ)', 'TA 2 (คุณบี)', 'TA 3 (คุณซี)', 'TA 4 (คุณดี)'];
@@ -146,7 +146,19 @@
         setFormData({ name: '', phone: '', position: '', status: '', comment: '', resumeName: '', resumeBase64: '' });
         
         if (GOOGLE_SCRIPT_URL) {
-           // send to Google Sheet via POST
+          try {
+            await fetch(GOOGLE_SCRIPT_URL, {
+              method: 'POST',
+              mode: 'no-cors', // ป้องกันปัญหาเรื่อง CORS ของเบราว์เซอร์
+              headers: {
+                'Content-Type': 'text/plain;charset=utf-8',
+              },
+              body: JSON.stringify(newRecord)
+            });
+            // ส่งข้อมูลสำเร็จ (การใช้ no-cors จะไม่คืนค่า Response ที่อ่านได้ แต่ทำงานได้ปกติใน Background)
+          } catch (error) {
+            console.error('เกิดข้อผิดพลาดในการส่งข้อมูลไปที่ Google Sheets:', error);
+          }
         }
       };
 
