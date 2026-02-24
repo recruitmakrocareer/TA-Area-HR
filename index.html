@@ -176,7 +176,6 @@
               const res = await fetch(`${GOOGLE_SCRIPT_URL}?t=${new Date().getTime()}`);
               const data = await res.json();
               
-              // Normalize data from sheet (ป้องกันบัค Type เปลี่ยนจากข้อความเป็นตัวเลข)
               if (data.applicants) {
                 setApplicants(data.applicants.map(a => ({...a, id: String(a.id), branchCode: String(a.branchCode).padStart(3, '0')})));
               }
@@ -228,7 +227,6 @@
         initLoad();
       }, []);
 
-      // สร้างรายชื่อ Area ให้เรียงตามตัวเลข
       useEffect(() => {
         if (appBranches.length > 0) {
           const uniqueAreas = [...new Set(appBranches.map(b => String(b.area)))].sort((a,b) => {
@@ -272,7 +270,7 @@
                 action: 'updateMaster', 
                 branches: newBranches, 
                 tas: newTAs.map(name => ({name})), 
-                positions: newPositions // ส่งชุดข้อมูลตำแหน่งและ TA ผู้รับผิดชอบ
+                positions: newPositions 
               })
             });
             alert('อัปเดตข้อมูล Master Data ขึ้นระบบส่วนกลางสำเร็จ!');
@@ -322,6 +320,65 @@
         reader.readAsBinaryString(file);
       };
 
+      const handleImportPositionCSV = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          try {
+            const bstr = evt.target.result;
+            const wb = XLSX.read(bstr, { type: 'binary' });
+            const wsname = wb.SheetNames[0];
+            const data = XLSX.utils.sheet_to_json(wb.Sheets[wsname], { header: 1 });
+            
+            const newPositions = [];
+            const newTAsSet = new Set(appTAs); // ดึง TA เดิมมาไว้ก่อน เพื่อไม่ให้ของเก่าหาย
+            let foundNewTA = false;
+
+            for (let i = 1; i < data.length; i++) {
+              const row = data[i];
+              if (row && row[0]) {
+                const posName = String(row[0]).replace(/\r/g, '').trim();
+                const recruitName = row[1] ? String(row[1]).replace(/\r/g, '').trim() : '';
+                
+                if (posName) {
+                  newPositions.push({ position: posName, recruit: recruitName });
+                  if (recruitName && !newTAsSet.has(recruitName)) {
+                    newTAsSet.add(recruitName);
+                    foundNewTA = true;
+                  }
+                }
+              }
+            }
+
+            if (newPositions.length > 0) {
+              setAppPositions(newPositions);
+              localStorage.setItem('hr_positions', JSON.stringify(newPositions));
+              
+              const updatedTAs = Array.from(newTAsSet);
+              if (foundNewTA) {
+                setAppTAs(updatedTAs);
+                localStorage.setItem('hr_tas', JSON.stringify(updatedTAs));
+              }
+              
+              syncMasterToCloud(appBranches, updatedTAs, newPositions);
+              
+              if (foundNewTA) {
+                alert(`อัปเดตตำแหน่งงานสำเร็จ!\n- นำเข้าตำแหน่งทั้งหมด ${newPositions.length} รายการ\n- อัปเดตรายชื่อ TA ให้อัตโนมัติ (พบรายชื่อใหม่)`);
+              } else {
+                alert(`อัปเดตตำแหน่งงานและผู้รับผิดชอบสำเร็จ! นำเข้าทั้งหมด ${newPositions.length} รายการ`);
+              }
+            } else {
+              alert('ไม่พบข้อมูลในไฟล์ (ข้อมูลตำแหน่งงานต้องอยู่ในคอลัมน์แรกสุด)');
+            }
+          } catch (err) {
+            console.error(err);
+            alert('เกิดข้อผิดพลาดในการอ่านไฟล์ CSV ตำแหน่งงาน');
+          }
+        };
+        reader.readAsBinaryString(file);
+      };
+
       const handleImportTACSV = (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -337,7 +394,7 @@
             for (let i = 1; i < data.length; i++) {
               const row = data[i];
               if (row && row[0]) {
-                const taName = String(row[0]).trim();
+                const taName = String(row[0]).replace(/\r/g, '').trim();
                 if (taName) newTAs.push(taName);
               }
             }
@@ -352,43 +409,6 @@
           } catch (err) {
             console.error(err);
             alert('เกิดข้อผิดพลาดในการอ่านไฟล์ CSV รายชื่อ TA');
-          }
-        };
-        reader.readAsBinaryString(file);
-      };
-
-      const handleImportPositionCSV = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-          try {
-            const bstr = evt.target.result;
-            const wb = XLSX.read(bstr, { type: 'binary' });
-            const wsname = wb.SheetNames[0];
-            const data = XLSX.utils.sheet_to_json(wb.Sheets[wsname], { header: 1 });
-            
-            const newPositions = [];
-            for (let i = 1; i < data.length; i++) {
-              const row = data[i];
-              if (row && row[0]) {
-                const posName = String(row[0]).trim();
-                const recruitName = row[1] ? String(row[1]).trim() : '';
-                if (posName) newPositions.push({ position: posName, recruit: recruitName });
-              }
-            }
-
-            if (newPositions.length > 0) {
-              setAppPositions(newPositions);
-              localStorage.setItem('hr_positions', JSON.stringify(newPositions));
-              syncMasterToCloud(appBranches, appTAs, newPositions);
-              alert(`อัปเดตตำแหน่งงานและผู้รับผิดชอบสำเร็จ! นำเข้าทั้งหมด ${newPositions.length} รายการ`);
-            } else {
-              alert('ไม่พบข้อมูลในไฟล์ (ข้อมูลตำแหน่งงานต้องอยู่ในคอลัมน์แรกสุด)');
-            }
-          } catch (err) {
-            console.error(err);
-            alert('เกิดข้อผิดพลาดในการอ่านไฟล์ CSV ตำแหน่งงาน');
           }
         };
         reader.readAsBinaryString(file);
@@ -453,13 +473,10 @@
       };
 
       const saveEditApp = () => {
-        // Validation ถ้าเป็นสถานะที่ต้องการเหตุผล
         if (['อื่นๆ', 'ไม่ผ่าน', 'ไม่มาเริ่มงาน'].includes(editAppForm.status) && !editAppForm.comment) {
           alert('กรุณาระบุเหตุผลในช่องที่กำหนด');
           return;
         }
-        
-        // ถ้าสถานะไม่ใช่กลุ่มนี้ ให้ล้างค่าคอมเมนต์ทิ้ง
         if (!['อื่นๆ', 'ไม่ผ่าน', 'ไม่มาเริ่มงาน'].includes(editAppForm.status)) {
           editAppForm.comment = '';
         }
@@ -471,11 +488,9 @@
       };
 
       const handleInlineStatusChange = (app, newStatus) => {
-        // ถ้าเป็นสถานะที่ต้องการเหตุผล ให้เข้าสู่โหมดการแก้ไข Row อัตโนมัติ เพื่อให้พิมพ์เหตุผล
         if (['อื่นๆ', 'ไม่ผ่าน', 'ไม่มาเริ่มงาน'].includes(newStatus)) {
           startEditApp({ ...app, status: newStatus });
         } else {
-          // บันทึกสถานะโดยตรงแบบไร้รอยต่อ
           const updatedApp = { ...app, status: newStatus, comment: '' };
           const newApps = applicants.map(a => String(a.id) === String(app.id) ? updatedApp : a);
           setApplicants(newApps);
@@ -582,15 +597,19 @@
           if (recruitAreaFilter && String(v.area) !== String(recruitAreaFilter)) return false;
           if (recruitBranchFilter && String(v.branchCode) !== String(recruitBranchFilter)) return false;
 
-          // กรองตาม TA (Recruit) ที่ผูกไว้กับตำแหน่ง
+          // กรองตาม TA (Recruit) ที่ผูกไว้กับตำแหน่งอัจฉริยะ!
           if (selectedTA) {
-            const posInfo = appPositions.find(p => String(p.position) === String(v.position));
-            if (posInfo && posInfo.recruit && String(posInfo.recruit).trim() !== '') {
-              // ถ้ามีข้อมูลผู้รับผิดชอบผูกไว้ใน CSV และไม่ตรงกับ TA ที่เลือกอยู่ ให้ซ่อนตำแหน่งงานนี้ทิ้งไป
-              if (String(posInfo.recruit).trim().toLowerCase() !== String(selectedTA).trim().toLowerCase()) {
-                return false;
-              }
+            const posInfo = appPositions.find(p => String(p.position).trim() === String(v.position).trim());
+            const assignedRecruit = posInfo && posInfo.recruit ? String(posInfo.recruit).trim() : '';
+            const currentTA = String(selectedTA).trim();
+
+            if (assignedRecruit !== '') {
+               // ถ้ามีการระบุชื่อไว้ ต้องตรงกันเป๊ะๆ ถึงจะเห็น
+               if (assignedRecruit.toLowerCase() !== currentTA.toLowerCase()) {
+                 return false;
+               }
             }
+            // ถ้า assignedRecruit เป็นค่าว่าง ('') แปลว่ายังไม่ได้ผูกกับใคร ให้แสดงเป็นกองกลาง (ทุกคนเห็นได้)
           }
 
           return true;
@@ -599,7 +618,6 @@
 
       const branchesForRecruitFilter = appBranches.filter(b => !recruitAreaFilter || String(b.area) === String(recruitAreaFilter));
       
-      // ประวัติของ TA ปัจจุบัน
       const myApplicants = applicants.filter(app => String(app.ta) === String(selectedTA));
 
       const dashboardData = useMemo(() => dashboardTA === 'ALL' ? applicants : applicants.filter(app => String(app.ta) === String(dashboardTA)), [applicants, dashboardTA]);
@@ -614,7 +632,6 @@
         return Object.keys(counts).map(key => ({ name: key, count: counts[key] })).sort((a, b) => b.count - a.count);
       }, [dashboardData]);
 
-      // สร้างข้อมูลสำหรับกราฟ SLA
       const slaChartData = useMemo(() => {
         const buckets = [
           { name: '0-14 วัน', count: 0, fill: '#10B981' }, 
@@ -639,7 +656,7 @@
       return (
         <div className="min-h-screen font-sans text-slate-800 pb-10 relative">
           
-          {/* Loading Overlay ตอนดึงข้อมูลครั้งแรกหรือซิงค์ */}
+          {/* Loading Overlay */}
           {isLoading && (
             <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center transition-all">
               <div className="bg-white px-8 py-6 rounded-2xl shadow-xl flex flex-col items-center space-y-4 animate-in fade-in zoom-in duration-300">
@@ -675,7 +692,6 @@
                     </button>
                   </div>
 
-                  {/* Settings Button */}
                   <button onClick={() => setShowSettings(true)} className="flex items-center space-x-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 px-3 py-2 rounded-lg transition-colors text-sm font-semibold border border-slate-200 shadow-sm whitespace-nowrap">
                     <Settings size={16} />
                     <span className="hidden sm:inline">ตั้งค่า</span>
@@ -814,6 +830,13 @@
                                         {appPositions.map(pos => <option key={pos.position} value={pos.position}>{pos.position}</option>)}
                                       </select>
                                     </td>
+                                    <td className="px-3 py-3 text-center text-slate-400 text-xs">- ออโต้ -</td>
+                                    <td className="px-3 py-3 text-center text-slate-400 text-xs">- ออโต้ -</td>
+                                    <td className="px-3 py-3">
+                                      <select value={editVacForm.manualStatus} onChange={(e) => setEditVacForm({...editVacForm, manualStatus: e.target.value})} className="w-full text-xs font-semibold border-slate-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm">
+                                        {VACANCY_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                                      </select>
+                                    </td>
                                     <td className="px-3 py-3 text-right whitespace-nowrap">
                                       <button onClick={saveEditVac} className="inline-flex items-center justify-center bg-emerald-100 text-emerald-700 hover:bg-emerald-600 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors mr-2 shadow-sm"><Check size={14} className="mr-1"/>บันทึก</button>
                                       <button onClick={() => setEditVacId(null)} className="inline-flex items-center justify-center bg-slate-200 text-slate-600 hover:bg-slate-300 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm"><X size={14} className="mr-1"/>ยกเลิก</button>
@@ -928,12 +951,12 @@
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                       <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/50">
                         <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">ตำแหน่งงาน</label>
-                      <select required value={editingVacancy.position} onChange={(e) => setEditingVacancy({...editingVacancy, position: e.target.value})} className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 focus:ring-blue-500/10 focus:border-blue-500 outline-none">
-                        <option value="">-- เลือกตำแหน่งงาน --</option>
-                        {appPositions.map(pos => <option key={pos.position} value={pos.position}>{pos.position}</option>)}
-                      </select>
-                    </div>
+                          <h3 className="font-bold text-slate-900 text-lg flex items-center space-x-2">
+                            <Target className="text-blue-600" size={20} />
+                            <span>ตำแหน่งงานที่กำลังเปิดรับ (Active Vacancies)</span>
+                          </h3>
+                          <p className="text-sm text-slate-500 mt-1 ml-7">ระบบกรองเฉพาะตำแหน่งที่คุณดูแล หรือตำแหน่งกองกลาง</p>
+                        </div>
                         
                         {/* Filters for Recruit Table */}
                         <div className="flex items-center space-x-3 w-full md:w-auto">
@@ -961,7 +984,7 @@
                           </thead>
                           <tbody className="divide-y divide-slate-50">
                             {activeVacanciesForRecruit.length === 0 ? (
-                              <tr><td colSpan="5" className="px-6 py-12 text-center text-slate-400">ไม่มีตำแหน่งงานว่างที่ตรงกับเงื่อนไขการค้นหา หรือยังไม่มีการเปิดรับตำแหน่งจาก Area HR</td></tr>
+                              <tr><td colSpan="5" className="px-6 py-12 text-center text-slate-400">ไม่มีตำแหน่งงานว่างที่ตรงกับคุณ หรือยังไม่มีการเปิดรับตำแหน่งจาก Area HR</td></tr>
                             ) : (
                               activeVacanciesForRecruit.map(v => {
                                 const { applicantCount, computedStatus } = getVacancyInsights(v.branchCode, v.position, v.manualStatus, v.createdAt);
@@ -1412,7 +1435,6 @@
                                <div className="flex flex-wrap items-center gap-2 mt-1">
                                  <p className="text-sm text-slate-500 flex items-center"><Phone size={12} className="mr-1"/> {app.phone}</p>
                                  
-                                 {/* เพิ่มปุ่ม Preview หรือสถานะไฟล์แนบ ตรงนี้ครับ */}
                                  {app.resumeBase64 && (
                                    <button 
                                      onClick={() => setPreviewFile({ base64: app.resumeBase64, name: app.resumeName })}
