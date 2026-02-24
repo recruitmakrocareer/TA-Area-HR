@@ -45,7 +45,7 @@
     import React, { useState, useMemo, useEffect } from 'https://esm.sh/react@18.2.0';
     import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
     import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'https://esm.sh/recharts@2.12.0?deps=react@18.2.0,react-dom@18.2.0';
-    import { Users, UserPlus, BarChart3, Building2, CheckCircle2, Clock, MapPin, Search, AlertCircle, FileText, Briefcase, Phone, MessageSquare, Map, Target, Edit, Trash2, X, BellRing, Download, Paperclip, Upload, Eye, PlusCircle, Settings } from 'https://esm.sh/lucide-react@0.344.0?deps=react@18.2.0';
+    import { Users, UserPlus, BarChart3, Building2, CheckCircle2, Clock, MapPin, Search, AlertCircle, FileText, Briefcase, Phone, MessageSquare, Map, Target, Edit, Trash2, X, BellRing, Download, Paperclip, Upload, Eye, PlusCircle, Settings, Check } from 'https://esm.sh/lucide-react@0.344.0?deps=react@18.2.0';
 
     // ==========================================
     // ⚙️ การตั้งค่า GOOGLE SHEETS API
@@ -131,8 +131,11 @@
       const [recruitBranchFilter, setRecruitBranchFilter] = useState('');
       const [addingApplicantFor, setAddingApplicantFor] = useState(null);
       const [formData, setFormData] = useState({ name: '', phone: '', status: '', comment: '', resumeName: '', resumeBase64: '' });
-      const [editingApplicant, setEditingApplicant] = useState(null);
       const [applicants, setApplicants] = useState([]);
+      
+      // --- STATE: Inline Row Editing (Recruit) ---
+      const [editAppId, setEditAppId] = useState(null);
+      const [editAppForm, setEditAppForm] = useState({});
 
       // --- STATE: Preview File ---
       const [previewFile, setPreviewFile] = useState(null);
@@ -140,9 +143,12 @@
       // --- STATE: Area HR ---
       const [selectedAreas, setSelectedAreas] = useState([]);
       const [vacancyForm, setVacancyForm] = useState({ branchCode: '', position: '', manualStatus: 'Vacant' });
-      const [editingVacancy, setEditingVacancy] = useState(null);
       const [viewApplicants, setViewApplicants] = useState(null);
       const [vacancies, setVacancies] = useState([]);
+      
+      // --- STATE: Inline Row Editing (Vacancy) ---
+      const [editVacId, setEditVacId] = useState(null);
+      const [editVacForm, setEditVacForm] = useState({});
 
       const [dashboardTA, setDashboardTA] = useState('ALL');
 
@@ -413,21 +419,36 @@
         }
       };
 
-      const submitEditApplicant = (e) => {
-        e.preventDefault();
-        const newApps = applicants.map(a => String(a.id) === String(editingApplicant.id) ? editingApplicant : a);
+      // --- INLINE ROW EDITING (Applicants) ---
+      const startEditApp = (app) => {
+        setEditAppId(app.id);
+        setEditAppForm({ ...app });
+      };
+
+      const saveEditApp = () => {
+        // Validation ถ้าเป็นสถานะที่ต้องการเหตุผล
+        if (['อื่นๆ', 'ไม่ผ่าน', 'ไม่มาเริ่มงาน'].includes(editAppForm.status) && !editAppForm.comment) {
+          alert('กรุณาระบุเหตุผลในช่องที่กำหนด');
+          return;
+        }
+        
+        // ถ้าสถานะไม่ใช่กลุ่มนี้ ให้ล้างค่าคอมเมนต์ทิ้ง
+        if (!['อื่นๆ', 'ไม่ผ่าน', 'ไม่มาเริ่มงาน'].includes(editAppForm.status)) {
+          editAppForm.comment = '';
+        }
+
+        const newApps = applicants.map(a => String(a.id) === String(editAppId) ? editAppForm : a);
         setApplicants(newApps);
-        setEditingApplicant(null);
+        setEditAppId(null);
         syncToCloud(newApps, vacancies);
       };
 
-      // --- Inline Status Change ---
       const handleInlineStatusChange = (app, newStatus) => {
-        // ถ้าเป็นสถานะที่ต้องการเหตุผล ให้เปิด Modal แทนเพื่อให้พิมพ์เหตุผล
+        // ถ้าเป็นสถานะที่ต้องการเหตุผล ให้เข้าสู่โหมดการแก้ไข Row อัตโนมัติ เพื่อให้พิมพ์เหตุผล
         if (['อื่นๆ', 'ไม่ผ่าน', 'ไม่มาเริ่มงาน'].includes(newStatus)) {
-          setEditingApplicant({ ...app, status: newStatus });
+          startEditApp({ ...app, status: newStatus });
         } else {
-          // บันทึกสถานะโดยตรง
+          // บันทึกสถานะโดยตรงแบบไร้รอยต่อ
           const updatedApp = { ...app, status: newStatus, comment: '' };
           const newApps = applicants.map(a => String(a.id) === String(app.id) ? updatedApp : a);
           setApplicants(newApps);
@@ -483,20 +504,25 @@
         }
       };
 
-      const submitEditVacancy = (e) => {
-        e.preventDefault();
+      // --- INLINE ROW EDITING (Vacancies) ---
+      const startEditVac = (v) => {
+        setEditVacId(v.id);
+        setEditVacForm({ ...v });
+      };
+
+      const saveEditVac = () => {
         const isDuplicate = vacancies.some(v => 
-          String(v.id) !== String(editingVacancy.id) && 
-          String(v.branchCode) === String(editingVacancy.branchCode) && 
-          String(v.position) === String(editingVacancy.position) && 
+          String(v.id) !== String(editVacId) && 
+          String(v.branchCode) === String(editVacForm.branchCode) && 
+          String(v.position) === String(editVacForm.position) && 
           v.manualStatus !== 'Closed'
         );
-        if (isDuplicate) { alert(`มีตำแหน่ง "${editingVacancy.position}" เปิดรับในสาขานี้อยู่แล้ว!`); return; }
+        if (isDuplicate) { alert(`มีตำแหน่ง "${editVacForm.position}" เปิดรับในสาขานี้อยู่แล้ว!`); return; }
         
-        const branch = appBranches.find(b => String(b.code) === String(editingVacancy.branchCode));
-        const newVacs = vacancies.map(v => String(v.id) === String(editingVacancy.id) ? { ...editingVacancy, area: branch ? branch.area : v.area, branchName: branch ? branch.name : v.branchName } : v);
+        const branch = appBranches.find(b => String(b.code) === String(editVacForm.branchCode));
+        const newVacs = vacancies.map(v => String(v.id) === String(editVacId) ? { ...editVacForm, area: branch ? branch.area : v.area, branchName: branch ? branch.name : v.branchName } : v);
         setVacancies(newVacs);
-        setEditingVacancy(null);
+        setEditVacId(null);
         syncToCloud(applicants, newVacs);
       };
 
@@ -705,7 +731,7 @@
                     <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-white flex-wrap gap-4">
                       <div>
                         <h3 className="font-bold text-slate-900 text-lg">รายการตำแหน่งงาน (Job Vacancies)</h3>
-                        <p className="text-sm text-slate-500 mt-0.5">คลิกที่ <span className="font-semibold text-blue-600">ชื่อตำแหน่ง</span> เพื่อแก้ไขข้อมูล</p>
+                        <p className="text-sm text-slate-500 mt-0.5">คลิกที่ <span className="font-semibold text-blue-600">ไอคอนดินสอ</span> หรือชื่อตำแหน่งเพื่อแก้ไขข้อมูลตรงจุด</p>
                       </div>
                       <div className="flex items-center space-x-3">
                         <span className="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-2 rounded-lg border border-slate-200">
@@ -734,6 +760,37 @@
                             <tr><td colSpan="6" className="px-6 py-12 text-center text-slate-400">ยังไม่มีข้อมูลสำหรับ Area ที่เลือก</td></tr>
                           ) : (
                             filteredVacancies.map((v) => {
+                              
+                              // ถ้ารายการนี้อยู่ในโหมดการแก้ไข (Inline Edit)
+                              if (editVacId === v.id) {
+                                return (
+                                  <tr key={v.id} className="bg-blue-50/50 shadow-inner">
+                                    <td className="px-3 py-3">
+                                      <select value={editVacForm.branchCode} onChange={(e) => setEditVacForm({...editVacForm, branchCode: e.target.value})} className="w-full text-xs font-semibold border-slate-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm">
+                                        {availableBranchesForAreas.map(b => <option key={b.code} value={b.code}>[{b.area}] {b.name}</option>)}
+                                      </select>
+                                    </td>
+                                    <td className="px-3 py-3">
+                                      <select value={editVacForm.position} onChange={(e) => setEditVacForm({...editVacForm, position: e.target.value})} className="w-full text-xs font-semibold border-slate-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm">
+                                        {appPositions.map(pos => <option key={pos} value={pos}>{pos}</option>)}
+                       </select>
+                                    </td>
+                                    <td className="px-3 py-3 text-center text-slate-400 text-xs">- ออโต้ -</td>
+                                    <td className="px-3 py-3 text-center text-slate-400 text-xs">- ออโต้ -</td>
+                                    <td className="px-3 py-3">
+                                      <select value={editVacForm.manualStatus} onChange={(e) => setEditVacForm({...editVacForm, manualStatus: e.target.value})} className="w-full text-xs font-semibold border-slate-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm">
+                                        {VACANCY_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                                      </select>
+                                    </td>
+                                    <td className="px-3 py-3 text-right whitespace-nowrap">
+                                      <button onClick={saveEditVac} className="inline-flex items-center justify-center bg-emerald-100 text-emerald-700 hover:bg-emerald-600 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors mr-2 shadow-sm"><Check size={14} className="mr-1"/>บันทึก</button>
+                                      <button onClick={() => setEditVacId(null)} className="inline-flex items-center justify-center bg-slate-200 text-slate-600 hover:bg-slate-300 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm"><X size={14} className="mr-1"/>ยกเลิก</button>
+                                    </td>
+                                  </tr>
+                                )
+                              }
+
+                              // โหมดแสดงผลปกติ
                               const { applicantCount, computedStatus, slaDays, matchedApplicants } = getVacancyInsights(v.branchCode, v.position, v.manualStatus, v.createdAt);
                               const isHiringAlert = computedStatus === 'Hiring' && v.manualStatus !== 'Closed';
 
@@ -744,10 +801,11 @@
                                     <div className="font-semibold text-slate-900">{v.branchName}</div>
                                     <div className="text-xs text-slate-400">{v.branchCode}</div>
                                   </td>
+                                  
                                   {/* Click to Edit Vacancy */}
-                                  <td className="px-5 py-4 cursor-pointer group" onClick={() => setEditingVacancy(v)} title="คลิกเพื่อแก้ไข">
+                                  <td className="px-5 py-4 cursor-pointer group" onClick={() => startEditVac(v)} title="คลิกเพื่อแก้ไข">
                                     <div className="text-slate-800 font-bold flex items-center gap-1.5 group-hover:text-blue-600 transition-colors">
-                                      {v.position} <Edit size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                                      {v.position} <Edit size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-blue-500" />
                                     </div>
                                   </td>
                                   
@@ -793,7 +851,10 @@
                                           <CheckCircle2 size={14} /><span>ปิดงาน</span>
                                         </button>
                                       )}
-                                      <button onClick={() => deleteVacancy(v.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                                      <button onClick={() => startEditVac(v)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="แก้ไขข้อมูล">
+                                        <Edit size={16} />
+                                      </button>
+                                      <button onClick={() => deleteVacancy(v.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="ลบ">
                                         <Trash2 size={16} />
                                       </button>
                                     </div>
@@ -919,61 +980,112 @@
                         </button>
                       </div>
                       <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left whitespace-nowrap"><thead className="bg-slate-50"><tr><th className="px-6 py-3">สาขา</th><th className="px-6 py-3">ชื่อ-นามสกุล / ตำแหน่ง</th><th className="px-6 py-3">สถานะ (คลิกเพื่อเปลี่ยน)</th><th className="px-6 py-3">ไฟล์แนบ</th><th className="px-6 py-3 text-right">จัดการ</th></tr></thead>
-                        <tbody>
-                          {myApplicants.length === 0 ? (
-                            <tr><td colSpan="5" className="px-6 py-8 text-center text-slate-400">คุณยังไม่มีประวัติการเพิ่มผู้สมัคร</td></tr>
-                          ) : (
-                            myApplicants.map(app => (
-                            <tr key={app.id} className="border-t hover:bg-slate-50">
-                              <td className="px-6 py-4">
-                                <div className="font-semibold text-slate-800">{app.branchName}</div>
-                                <div className="text-xs text-slate-400">{app.branchCode}</div>
-                              </td>
-                              
-                              {/* Click to Edit Applicant */}
-                              <td className="px-6 py-4 cursor-pointer group" onClick={() => setEditingApplicant(app)} title="คลิกเพื่อแก้ไข">
-                                <div className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors flex items-center gap-1.5">
-                                  {app.name} <Edit size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                                </div>
-                                <div className="text-sm text-slate-600 mt-0.5">{app.position} • {app.phone}</div>
-                              </td>
-
-                              {/* Inline Status Dropdown */}
-                              <td className="px-6 py-4">
-                                <select
-                                  value={app.status}
-                                  onChange={(e) => handleInlineStatusChange(app, e.target.value)}
-                                  className="status-select font-bold text-xs px-3 py-1.5 rounded-full outline-none cursor-pointer border transition-all"
-                                  style={{
-                                    backgroundColor: `${STATUS_COLORS[app.status]}15`,
-                                    color: STATUS_COLORS[app.status],
-                                    borderColor: `${STATUS_COLORS[app.status]}30`
-                                  }}
-                                >
-                                  {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                                </select>
-                                {app.comment && <div className="text-xs text-slate-500 mt-1.5 max-w-[200px] truncate" title={app.comment}>เหตุผล: {app.comment}</div>}
-                              </td>
-
-                              <td className="px-6 py-4">
-                                {app.resumeBase64 ? (
-                                  <div className="flex items-center space-x-2">
-                                    <button onClick={() => setPreviewFile({ base64: app.resumeBase64, name: app.resumeName })} className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1.5 rounded-md border border-blue-200 flex items-center hover:bg-blue-600 hover:text-white transition-colors shadow-sm cursor-pointer" title="ดูตัวอย่าง">
-                                      <Eye size={12} className="mr-1.5"/> Preview
-                                    </button>
-                                  </div>
-                                ) : app.resumeName ? (
-                                  <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md border flex w-fit items-center"><Paperclip size={12} className="mr-1"/> มีไฟล์</span>
-                                ) : (
-                                  <span className="text-xs text-slate-400">-</span>
-                                )}
-                              </td>
-                              <td className="px-6 py-4 text-right">
-                                <button onClick={() => deleteApplicant(app.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="ลบข้อมูล"><Trash2 size={16} /></button>
-                              </td>
+                        <table className="w-full text-sm text-left whitespace-nowrap">
+                          <thead className="bg-slate-50">
+                            <tr>
+                              <th className="px-6 py-3">สาขา</th>
+                              <th className="px-6 py-3">ชื่อ-นามสกุล / ตำแหน่ง</th>
+                              <th className="px-6 py-3">สถานะ (คลิกเพื่อเปลี่ยน)</th>
+                              <th className="px-6 py-3">ไฟล์แนบ</th>
+                              <th className="px-6 py-3 text-right">จัดการ</th>
                             </tr>
-                          )))}
+                          </thead>
+                          <tbody>
+                            {myApplicants.length === 0 ? (
+                              <tr><td colSpan="5" className="px-6 py-8 text-center text-slate-400">คุณยังไม่มีประวัติการเพิ่มผู้สมัคร</td></tr>
+                            ) : (
+                              myApplicants.map(app => {
+                                // โหมดแก้ไข Inline สำหรับข้อมูลผู้สมัคร
+                                if (editAppId === app.id) {
+                                  return (
+                                    <tr key={app.id} className="bg-blue-50/50 shadow-inner">
+                                      <td className="px-3 py-3">
+                                        <div className="font-semibold text-slate-800 text-xs">{app.branchName}</div>
+                                        <div className="text-[10px] text-slate-400">{app.branchCode}</div>
+                                      </td>
+                                      <td className="px-3 py-3 space-y-1.5">
+                                        <input value={editAppForm.name} onChange={e => setEditAppForm({...editAppForm, name: e.target.value})} className="w-full text-xs font-semibold border-slate-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm" placeholder="ชื่อ-นามสกุล" />
+                                        <input value={editAppForm.phone} onChange={e => setEditAppForm({...editAppForm, phone: e.target.value})} className="w-full text-xs font-semibold border-slate-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm" placeholder="เบอร์ติดต่อ" />
+                                      </td>
+                                      <td className="px-3 py-3 space-y-1.5">
+                                        <select value={editAppForm.status} onChange={e => setEditAppForm({...editAppForm, status: e.target.value})} className="w-full text-xs font-semibold border-slate-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm">
+                                          {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                                        </select>
+                                        {['อื่นๆ', 'ไม่ผ่าน', 'ไม่มาเริ่มงาน'].includes(editAppForm.status) && (
+                                          <input value={editAppForm.comment || ''} onChange={e => setEditAppForm({...editAppForm, comment: e.target.value})} className="w-full text-xs font-semibold border-orange-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 shadow-sm" placeholder="ระบุเหตุผล..." />
+                                        )}
+                                      </td>
+                                      <td className="px-3 py-3">
+                                        {editAppForm.resumeName ? <span className="text-xs text-slate-500 truncate max-w-[100px] block">{editAppForm.resumeName}</span> : <span className="text-xs text-slate-400">-</span>}
+                                      </td>
+                                      <td className="px-3 py-3 text-right whitespace-nowrap">
+                                        <button onClick={saveEditApp} className="inline-flex items-center justify-center bg-emerald-100 text-emerald-700 hover:bg-emerald-600 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors mr-2 shadow-sm"><Check size={14} className="mr-1"/>บันทึก</button>
+                                        <button onClick={() => setEditAppId(null)} className="inline-flex items-center justify-center bg-slate-200 text-slate-600 hover:bg-slate-300 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm"><X size={14} className="mr-1"/>ยกเลิก</button>
+                                      </td>
+                                    </tr>
+                                  );
+                                }
+
+                                // โหมดแสดงผลปกติ
+                                return (
+                                  <tr key={app.id} className="border-t hover:bg-slate-50">
+                                    <td className="px-6 py-4">
+                                      <div className="font-semibold text-slate-800">{app.branchName}</div>
+                                      <div className="text-xs text-slate-400">{app.branchCode}</div>
+                                    </td>
+                                    
+                                    {/* Click to Edit Applicant */}
+                                    <td className="px-6 py-4 cursor-pointer group" onClick={() => startEditApp(app)} title="คลิกเพื่อแก้ไข">
+                                      <div className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors flex items-center gap-1.5">
+                                        {app.name} <Edit size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-blue-500" />
+                                      </div>
+                                      <div className="text-sm text-slate-600 mt-0.5">{app.position} • {app.phone}</div>
+                                    </td>
+
+                                    {/* Inline Status Dropdown */}
+                                    <td className="px-6 py-4">
+                                      <select
+                                        value={app.status}
+                                        onChange={(e) => handleInlineStatusChange(app, e.target.value)}
+                                        className="status-select font-bold text-xs px-3 py-1.5 rounded-full outline-none cursor-pointer border transition-all hover:shadow-sm"
+                                        style={{
+                                          backgroundColor: `${STATUS_COLORS[app.status]}15`,
+                                          color: STATUS_COLORS[app.status],
+                                          borderColor: `${STATUS_COLORS[app.status]}30`
+                                        }}
+                                      >
+                                        {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                                      </select>
+                                      {app.comment && <div className="text-xs text-slate-500 mt-1.5 max-w-[200px] truncate" title={app.comment}>เหตุผล: {app.comment}</div>}
+                                    </td>
+
+                                    <td className="px-6 py-4">
+                                      {app.resumeBase64 ? (
+                                        <div className="flex items-center space-x-2">
+                                          <button onClick={() => setPreviewFile({ base64: app.resumeBase64, name: app.resumeName })} className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1.5 rounded-md border border-blue-200 flex items-center hover:bg-blue-600 hover:text-white transition-colors shadow-sm cursor-pointer" title="ดูตัวอย่าง">
+                                            <Eye size={12} className="mr-1.5"/> Preview
+                                          </button>
+                                        </div>
+                                      ) : app.resumeName ? (
+                                        <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md border flex w-fit items-center"><Paperclip size={12} className="mr-1"/> มีไฟล์</span>
+                                      ) : (
+                                        <span className="text-xs text-slate-400">-</span>
+                                      )}
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                      <div className="flex items-center justify-end space-x-2">
+                                        <button onClick={() => startEditApp(app)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="แก้ไข">
+                                          <Edit size={16} />
+                                        </button>
+                                        <button onClick={() => deleteApplicant(app.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="ลบข้อมูล">
+                                          <Trash2 size={16} />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )
+                              })
+                            )}
                         </tbody></table>
                       </div>
                     </div>
@@ -1241,6 +1353,105 @@
                       <Upload size={18} className="text-slate-400 group-hover:text-emerald-500 transition-colors" />
                       <input type="file" accept=".csv" className="hidden" onChange={(e) => { handleImportTACSV(e); setShowSettings(false); }} />
                     </label>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Modal: View Applicants (Popup รายชื่อผู้สมัครเมื่อกดจากตาราง Area HR) */}
+            {viewApplicants && (
+               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+                 <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden">
+                   <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                     <div>
+                       <h3 className="font-bold text-lg text-slate-900">ผู้สมัคร: {viewApplicants.position}</h3>
+                       <p className="text-sm text-slate-500">{viewApplicants.branchName}</p>
+                     </div>
+                     <button onClick={() => setViewApplicants(null)} className="p-2 text-slate-400 hover:bg-slate-200 rounded-full transition-colors"><X size={20} /></button>
+                   </div>
+                   <div className="p-6 max-h-[60vh] overflow-y-auto">
+                     <div className="space-y-3">
+                       {viewApplicants.list.map(app => (
+                         <div key={app.id} className="p-4 rounded-xl border border-slate-100 flex justify-between items-center hover:border-blue-200 transition-colors">
+                           <div className="flex items-start space-x-3">
+                             <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold shrink-0">{app.name.charAt(0)}</div>
+                             <div>
+                               <p className="font-bold text-slate-900">{app.name}</p>
+                               <div className="flex flex-wrap items-center gap-2 mt-1">
+                                 <p className="text-sm text-slate-500 flex items-center"><Phone size={12} className="mr-1"/> {app.phone}</p>
+                                 
+                                 {/* เพิ่มปุ่ม Preview หรือสถานะไฟล์แนบ ตรงนี้ครับ */}
+                                 {app.resumeBase64 && (
+                                   <button 
+                                     onClick={() => setPreviewFile({ base64: app.resumeBase64, name: app.resumeName })}
+                                     className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md border border-blue-200 flex items-center hover:bg-blue-600 hover:text-white transition-colors"
+                                     title="ดูตัวอย่างเรซูเม่"
+                                   >
+                                     <Eye size={12} className="mr-1"/> เรซูเม่
+                                   </button>
+                                 )}
+                               </div>
+                             </div>
+                           </div>
+                           <div className="text-right shrink-0">
+                             <span className="inline-block px-2.5 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: `${STATUS_COLORS[app.status]}15`, color: STATUS_COLORS[app.status] }}>{app.status}</span>
+                             <p className="text-[10px] text-slate-400 mt-1">โดย {app.ta}</p>
+                           </div>
+                         </div>
+                       ))}
+                     </div>
+                   </div>
+                 </div>
+               </div>
+             )}
+
+            {/* Modal: Preview File (แสดงไฟล์เรซูเม่) */}
+            {previewFile && (
+              <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden">
+                  <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                    <div>
+                      <h3 className="font-bold text-lg text-slate-900 flex items-center space-x-2">
+                        <Eye size={20} className="text-blue-500" />
+                        <span>ตัวอย่างไฟล์เอกสาร</span>
+                      </h3>
+                      <p className="text-sm text-slate-500 mt-0.5">{previewFile.name}</p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <a 
+                        href={previewFile.base64} 
+                        download={previewFile.name} 
+                        className="flex items-center space-x-1.5 px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl transition-colors font-semibold shadow-sm text-sm"
+                      >
+                        <Download size={16} /><span>ดาวน์โหลด</span>
+                      </a>
+                      <button onClick={() => setPreviewFile(null)} className="p-2 text-slate-400 hover:bg-slate-200 hover:text-slate-700 rounded-full transition-colors"><X size={20} /></button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex-1 bg-slate-100 p-4 sm:p-6 flex items-center justify-center overflow-hidden">
+                    {previewFile.base64.startsWith('data:application/pdf') || previewFile.base64.startsWith('data:image/') ? (
+                      <iframe 
+                        src={previewFile.base64} 
+                        className="w-full h-full rounded-xl border border-slate-200 shadow-sm bg-white" 
+                        title="File Preview"
+                      ></iframe>
+                    ) : (
+                      <div className="text-center bg-white p-12 rounded-2xl shadow-sm border border-slate-200 max-w-sm">
+                        <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                          <FileText size={40} className="text-orange-400" />
+                        </div>
+                        <p className="text-lg font-bold text-slate-800 mb-2">ไม่สามารถแสดงตัวอย่างไฟล์ได้</p>
+                        <p className="text-sm text-slate-500 mb-6">ไฟล์ประเภท Word (doc, docx) หรือไฟล์อื่นๆ จำเป็นต้องดาวน์โหลดเพื่อเปิดดูในเครื่องของคุณครับ</p>
+                        <a 
+                          href={previewFile.base64} 
+                          download={previewFile.name} 
+                          className="inline-flex items-center justify-center space-x-2 bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors font-semibold shadow-sm w-full"
+                        >
+                          <Download size={18} /><span>ดาวน์โหลดไฟล์</span>
+                        </a>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
