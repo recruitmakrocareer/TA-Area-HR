@@ -11,7 +11,7 @@
   <!-- Babel for JSX -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   
-  <!-- SheetJS for Excel Export -->
+  <!-- SheetJS for Excel/CSV Parsing and Export -->
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 
   <style>
@@ -21,6 +21,8 @@
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #F8FAFC; }
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
 </head>
 <body>
@@ -31,24 +33,64 @@
     import React, { useState, useMemo, useEffect } from 'https://esm.sh/react@18.2.0';
     import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
     import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'https://esm.sh/recharts@2.12.0?deps=react@18.2.0,react-dom@18.2.0';
-    import { Users, UserPlus, BarChart3, Building2, CheckCircle2, Clock, MapPin, Search, AlertCircle, FileText, Briefcase, Phone, MessageSquare, Map, Target, Edit, Trash2, X, BellRing, Download, Paperclip } from 'https://esm.sh/lucide-react@0.344.0?deps=react@18.2.0';
+    import { Users, UserPlus, BarChart3, Building2, CheckCircle2, Clock, MapPin, Search, AlertCircle, FileText, Briefcase, Phone, MessageSquare, Map, Target, Edit, Trash2, X, BellRing, Download, Paperclip, Upload } from 'https://esm.sh/lucide-react@0.344.0?deps=react@18.2.0';
 
     // ==========================================
     // ⚙️ การตั้งค่า GOOGLE SHEETS API
-    // นำ Web App URL ของ Google Apps Script มาวางที่นี่
     // ==========================================
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwKUyZOjJ59YufdzNsGoah5GjiuD64oaRu3sgQob8NRVE3v485KAHQulXyqzx3ME1kVqQ/exec"; 
 
-    // --- MOCK DATA (Fallback) ---
+    // --- MOCK DATA ---
     const TA_LIST = ['TA 1 (คุณเอ)', 'TA 2 (คุณบี)', 'TA 3 (คุณซี)', 'TA 4 (คุณดี)'];
-    const AREAS = Array.from({ length: 14 }, (_, i) => `Area ${i + 1}`);
 
-    const BRANCHES = [
-      { code: 'HQ001', name: 'สำนักงานใหญ่ (Head Office)', area: 'Area 1' },
-      { code: 'BKK02', name: 'สาขาสุขุมวิท', area: 'Area 1' },
-      { code: 'BKK03', name: 'สาขาสีลม', area: 'Area 2' },
-      { code: 'CNX01', name: 'สาขาเชียงใหม่', area: 'Area 8' },
-      { code: 'HKT01', name: 'สาขาภูเก็ต', area: 'Area 14' },
+    // ดึงข้อมูลสาขาจาก CSV ที่ระบบอ่านได้เบื้องต้น
+    const DEFAULT_BRANCHES = [
+      { code: '001', name: 'สาขาลาดพร้าว', area: 'Area 5' },
+      { code: '002', name: 'สาขาแจ้งวัฒนะ', area: 'Area 10' },
+      { code: '003', name: 'สาขาศรีนครินทร์', area: 'Area 11' },
+      { code: '004', name: 'สาขาบางบอน', area: 'Area 1' },
+      { code: '005', name: 'สาขาชลบุรี', area: 'Area 9' },
+      { code: '006', name: 'สาขาเชียงใหม่ 1 (ตลาดเมืองใหม่)', area: 'Area 6' },
+      { code: '007', name: 'สาขานครราชสีมา', area: 'Area 2' },
+      { code: '008', name: 'สาขารังสิต', area: 'Area 11' },
+      { code: '009', name: 'สาขาหาดใหญ่', area: 'Area 4' },
+      { code: '010', name: 'สาขาอุดรธานี', area: 'Area 7' },
+      { code: '011', name: 'สาขาพิษณุโลก', area: 'Area 2' },
+      { code: '012', name: 'สาขาขอนแก่น', area: 'Area 7' },
+      { code: '013', name: 'สาขาสุราษฏร์ธานี', area: 'Area 4' },
+      { code: '014', name: 'สาขาอุบลราชธานี', area: 'Area 8' },
+      { code: '015', name: 'สาขาระยอง', area: 'Area 14' },
+      { code: '016', name: 'สาขานครสวรรค์', area: 'Area 2' },
+      { code: '017', name: 'สาขาจรัญสนิทวงศ์', area: 'Area 10' },
+      { code: '018', name: 'สาขาสาทร', area: 'Area 13' },
+      { code: '019', name: 'สาขานครปฐม', area: 'Area 5' },
+      { code: '020', name: 'สาขาสุรินทร์', area: 'Area 8' },
+      { code: '021', name: 'สาขาสามเสน', area: 'Area 13' },
+      { code: '022', name: 'สาขานครศรีธรรมราช', area: 'Area 4' },
+      { code: '023', name: 'สาขาเชียงราย', area: 'Area 6' },
+      { code: '122', name: 'สาขาประชาอุทิศ', area: 'Area 3' },
+      { code: '123', name: 'สาขาสุขุมวิท 71', area: 'Area 11' },
+      { code: '124', name: 'สาขานวมินทร์ 70', area: 'Area 11' },
+      { code: '125', name: 'สาขาชะอำ', area: 'Area 13' },
+      { code: '126', name: 'สาขาอ่อนนุช', area: 'Area 11' },
+      { code: '127', name: 'สาขาสุขสวัสดิ์', area: 'Area 3' },
+      { code: '128', name: 'สาขากบินทร์บุรี', area: 'Area 14' },
+      { code: '129', name: 'สาขาลาดกระบัง', area: 'Area 9' },
+      { code: '130', name: 'สาขานาทองเจริญ', area: 'Area 3' },
+      { code: '131', name: 'สาขาบ่อวิน', area: 'Area 9' },
+      { code: '132', name: 'สาขาสัตหีบ', area: 'Area 9' },
+      { code: '133', name: 'สาขารามคำแหง 24', area: 'Area 5' },
+      { code: '134', name: 'สาขาอมตะนคร', area: 'Area 9' },
+      { code: '135', name: 'สาขาบางคอแหลม', area: 'Area 13' },
+      { code: '136', name: 'สาขาขอนแก่น 2', area: 'Area 7' },
+      { code: '137', name: 'สาขาตลาดวงศกร 2', area: 'Area 13' },
+      { code: '138', name: 'สาขาเหม่งจ๋าย', area: 'Area 13' },
+      { code: '139', name: 'สาขาสุขุมวิท 22', area: 'Area 13' },
+      { code: '140', name: 'สาขาถนนจันทน์', area: 'Area 13' },
+      { code: '141', name: 'สาขาลำลูกกา', area: 'Area 3' },
+      { code: '142', name: 'สาขาแพรกษา', area: 'Area 14' },
+      { code: '143', name: 'สาขาประดิษฐ์มนูธรรม', area: 'Area 13' },
+      { code: '144', name: 'สาขาตลาดรุ่งโรจน์', area: 'Area 3' }
     ];
 
     const STATUSES = ['รอสัมภาษณ์', 'ไม่เข้าสัมภาษณ์', 'ผ่าน', 'ไม่ผ่าน', 'สำรอง', 'ตรวจสุขภาพ', 'รอเริ่มงาน', 'มาเริ่มงาน', 'ไม่มาเริ่มงาน', 'อื่นๆ'];
@@ -59,59 +101,98 @@
 
     function App() {
       const [activeTab, setActiveTab] = useState('area_hr');
-      const [isLoading, setIsLoading] = useState(false);
+      
+      // --- STATE: สาขาที่แปลงข้อมูลมาจาก CSV ---
+      const [appBranches, setAppBranches] = useState([]);
+      const [appAreas, setAppAreas] = useState([]);
       
       // --- STATE: HR Recruit ---
       const [selectedTA, setSelectedTA] = useState('');
       const [selectedBranchCode, setSelectedBranchCode] = useState('');
       const [formData, setFormData] = useState({ name: '', phone: '', position: '', status: '', comment: '', resumeName: '', resumeBase64: '' });
       const [editingApplicant, setEditingApplicant] = useState(null);
-
-      const [applicants, setApplicants] = useState([
-        { id: 1, ta: 'TA 1 (คุณเอ)', branchCode: 'HQ001', branchName: 'สำนักงานใหญ่ (Head Office)', name: 'สมชาย ใจดี', phone: '081-234-5678', position: 'พนักงานขาย', status: 'ตรวจสุขภาพ', comment: '', timestamp: new Date(Date.now() - 86400000).toLocaleString('th-TH') }
-      ]);
+      const [applicants, setApplicants] = useState([]);
 
       // --- STATE: Area HR ---
       const [selectedAreas, setSelectedAreas] = useState([]);
       const [vacancyForm, setVacancyForm] = useState({ branchCode: '', position: '', manualStatus: 'Vacant' });
       const [editingVacancy, setEditingVacancy] = useState(null);
       const [viewApplicants, setViewApplicants] = useState(null);
-      
-      const [vacancies, setVacancies] = useState([
-        { id: 1, area: 'Area 1', branchCode: 'HQ001', branchName: 'สำนักงานใหญ่ (Head Office)', position: 'พนักงานขาย', manualStatus: 'Vacant', createdAt: Date.now() - (7 * 86400000), timestamp: new Date(Date.now() - (7 * 86400000)).toLocaleString('th-TH') }
-      ]);
+      const [vacancies, setVacancies] = useState([]);
 
       const [dashboardTA, setDashboardTA] = useState('ALL');
 
       // --- EFFECTS: Load Data ---
       useEffect(() => {
-        // จำลองการดึงข้อมูลจาก LocalStorage หรือ Google Sheets
-        const loadData = async () => {
-          setIsLoading(true);
-          if (GOOGLE_SCRIPT_URL) {
-            try {
-              // Fetch from Google Sheet logic here
-              // const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=getData`);
-              // const data = await response.json();
-              // setApplicants(data.applicants); setVacancies(data.vacancies);
-            } catch (error) { console.error("Failed to load from Google Sheets", error); }
-          } else {
-            const localApps = localStorage.getItem('hr_applicants');
-            const localVacs = localStorage.getItem('hr_vacancies');
-            if(localApps) setApplicants(JSON.parse(localApps));
-            if(localVacs) setVacancies(JSON.parse(localVacs));
-          }
-          setIsLoading(false);
-        };
-        loadData();
+        // โหลดข้อมูลสาขา
+        const localBranches = localStorage.getItem('hr_branches');
+        let initialBranches = DEFAULT_BRANCHES;
+        if (localBranches) {
+          try { initialBranches = JSON.parse(localBranches); } catch(e) {}
+        }
+        setAppBranches(initialBranches);
+
+        // โหลดข้อมูลประวัติอื่นๆ
+        const localApps = localStorage.getItem('hr_applicants');
+        const localVacs = localStorage.getItem('hr_vacancies');
+        if(localApps) setApplicants(JSON.parse(localApps));
+        if(localVacs) setVacancies(JSON.parse(localVacs));
       }, []);
 
+      // สร้างรายชื่อ Area ให้เรียงตามตัวเลข
       useEffect(() => {
-        if(!GOOGLE_SCRIPT_URL) {
-          localStorage.setItem('hr_applicants', JSON.stringify(applicants));
-          localStorage.setItem('hr_vacancies', JSON.stringify(vacancies));
+        if (appBranches.length > 0) {
+          const uniqueAreas = [...new Set(appBranches.map(b => b.area))].sort((a,b) => {
+            const numA = parseInt(a.replace(/\D/g, '')) || 0;
+            const numB = parseInt(b.replace(/\D/g, '')) || 0;
+            return numA - numB;
+          });
+          setAppAreas(uniqueAreas);
         }
+      }, [appBranches]);
+
+      useEffect(() => {
+        localStorage.setItem('hr_applicants', JSON.stringify(applicants));
+        localStorage.setItem('hr_vacancies', JSON.stringify(vacancies));
       }, [applicants, vacancies]);
+
+      // --- IMPORT CSV FUNCTION ---
+      const handleImportCSV = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          try {
+            const bstr = evt.target.result;
+            const wb = XLSX.read(bstr, { type: 'binary' });
+            const wsname = wb.SheetNames[0];
+            const data = XLSX.utils.sheet_to_json(wb.Sheets[wsname], { header: 1 });
+            
+            const newBranches = [];
+            for (let i = 1; i < data.length; i++) {
+              const row = data[i];
+              if (row && row[0] && row[1] && row[2]) {
+                const code = String(row[0]).padStart(3, '0');
+                const name = String(row[1]).replace(/\n/g, ' ').replace(/\r/g, '').trim();
+                const area = String(row[2]).replace(/\r/g, '').trim();
+                newBranches.push({ code, name, area });
+              }
+            }
+
+            if (newBranches.length > 0) {
+              setAppBranches(newBranches);
+              localStorage.setItem('hr_branches', JSON.stringify(newBranches));
+              alert(`อัปเดตข้อมูลสาขาสำเร็จ! นำเข้าทั้งหมด ${newBranches.length} สาขา`);
+            } else {
+              alert('ไม่พบข้อมูลในไฟล์ หรือรูปแบบคอลัมน์ไม่ถูกต้อง (ต้องมี Store No., Location Name, Area No.)');
+            }
+          } catch (err) {
+            console.error(err);
+            alert('เกิดข้อผิดพลาดในการอ่านไฟล์ CSV');
+          }
+        };
+        reader.readAsBinaryString(file);
+      };
 
       // --- EXPORT EXCEL ---
       const exportToExcel = (dataList, filename) => {
@@ -139,7 +220,7 @@
       const handleRecruitSubmit = async (e) => {
         e.preventDefault();
         if (!selectedTA || !selectedBranchCode) { alert('กรุณาเลือก TA และ สาขาก่อนบันทึกข้อมูล'); return; }
-        const branch = BRANCHES.find(b => b.code === selectedBranchCode);
+        const branch = appBranches.find(b => b.code === selectedBranchCode);
         const newRecord = { id: Date.now(), ta: selectedTA, branchCode: branch.code, branchName: branch.name, ...formData, timestamp: new Date().toLocaleString('th-TH') };
         
         setApplicants([newRecord, ...applicants]);
@@ -149,13 +230,10 @@
           try {
             await fetch(GOOGLE_SCRIPT_URL, {
               method: 'POST',
-              mode: 'no-cors', // ป้องกันปัญหาเรื่อง CORS ของเบราว์เซอร์
-              headers: {
-                'Content-Type': 'text/plain;charset=utf-8',
-              },
+              mode: 'no-cors',
+              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
               body: JSON.stringify(newRecord)
             });
-            // ส่งข้อมูลสำเร็จ (การใช้ no-cors จะไม่คืนค่า Response ที่อ่านได้ แต่ทำงานได้ปกติใน Background)
           } catch (error) {
             console.error('เกิดข้อผิดพลาดในการส่งข้อมูลไปที่ Google Sheets:', error);
           }
@@ -181,7 +259,7 @@
 
       const handleVacancySubmit = (e) => {
         e.preventDefault();
-        const branch = BRANCHES.find(b => b.code === vacancyForm.branchCode);
+        const branch = appBranches.find(b => b.code === vacancyForm.branchCode);
         if (!branch) return;
 
         const isDuplicate = vacancies.some(v => v.branchCode === branch.code && v.position === vacancyForm.position && v.manualStatus !== 'Closed');
@@ -201,7 +279,7 @@
         const isDuplicate = vacancies.some(v => v.id !== editingVacancy.id && v.branchCode === editingVacancy.branchCode && v.position === editingVacancy.position && v.manualStatus !== 'Closed');
         if (isDuplicate) { alert(`มีตำแหน่ง "${editingVacancy.position}" เปิดรับในสาขานี้อยู่แล้ว!`); return; }
         
-        const branch = BRANCHES.find(b => b.code === editingVacancy.branchCode);
+        const branch = appBranches.find(b => b.code === editingVacancy.branchCode);
         setVacancies(vacancies.map(v => v.id === editingVacancy.id ? { ...editingVacancy, area: branch.area, branchName: branch.name } : v));
         setEditingVacancy(null);
       };
@@ -209,7 +287,7 @@
       const closeVacancy = (id) => setVacancies(vacancies.map(v => v.id === id ? { ...v, manualStatus: 'Closed' } : v));
 
       // --- DERIVED DATA ---
-      const availableBranchesForAreas = BRANCHES.filter(b => selectedAreas.includes(b.area));
+      const availableBranchesForAreas = appBranches.filter(b => selectedAreas.includes(b.area));
       const filteredVacancies = vacancies.filter(v => selectedAreas.length === 0 || selectedAreas.includes(v.area));
 
       const getVacancyInsights = (branchCode, position, manualStatus, createdAt) => {
@@ -224,7 +302,7 @@
         return { applicantCount, computedStatus, slaDays, matchedApplicants };
       };
 
-      const selectedBranch = BRANCHES.find(b => b.code === selectedBranchCode);
+      const selectedBranch = appBranches.find(b => b.code === selectedBranchCode);
       const filteredEntryList = applicants.filter(app => (!selectedTA || app.ta === selectedTA) && (!selectedBranchCode || app.branchCode === selectedBranchCode));
       const dashboardData = useMemo(() => dashboardTA === 'ALL' ? applicants : applicants.filter(app => app.ta === dashboardTA), [applicants, dashboardTA]);
       const statusChartData = useMemo(() => {
@@ -252,8 +330,8 @@
                   <span className="text-xl font-bold text-slate-900 tracking-tight">HR <span className="text-blue-600 font-black">Recruit</span></span>
                 </div>
                 
-                {/* Tabs */}
-                <div className="flex items-center overflow-x-auto pb-1 md:pb-0 hide-scrollbar">
+                {/* Tabs & Import Button */}
+                <div className="flex items-center space-x-3 overflow-x-auto pb-1 md:pb-0 hide-scrollbar">
                   <div className="flex space-x-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/60 whitespace-nowrap">
                     <button onClick={() => setActiveTab('area_hr')} className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === 'area_hr' ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-900/5' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}>
                       <Briefcase size={16} strokeWidth={activeTab === 'area_hr' ? 2.5 : 2} /><span>Area HR (ตำแหน่งงาน)</span>
@@ -265,6 +343,14 @@
                       <BarChart3 size={16} strokeWidth={activeTab === 'dashboard' ? 2.5 : 2} /><span>แดชบอร์ดสรุปผล</span>
                     </button>
                   </div>
+
+                  {/* IMPORT CSV BUTTON */}
+                  <label className="flex items-center space-x-1.5 bg-white text-slate-600 hover:bg-slate-50 hover:text-blue-600 text-xs font-bold px-3 py-2 rounded-lg transition-colors shadow-sm cursor-pointer border border-slate-200 whitespace-nowrap" title="อัปโหลดไฟล์ StoreList.csv">
+                    <Upload size={14} />
+                    <span className="hidden sm:inline">อัปเดตไฟล์สาขา (CSV)</span>
+                    <input type="file" accept=".csv" className="hidden" onChange={handleImportCSV} />
+                  </label>
+
                 </div>
               </div>
             </div>
@@ -292,7 +378,7 @@
                   
                   {/* BEAUTIFUL GRID LAYOUT FOR AREAS */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-                    {AREAS.map(area => {
+                    {appAreas.map(area => {
                       const isSelected = selectedAreas.includes(area);
                       return (
                         <button 
@@ -477,7 +563,7 @@
                       <label className="block text-sm font-semibold text-slate-700 mb-2">สาขาที่สมัคร <span className="text-red-500">*</span></label>
                       <select value={selectedBranchCode} onChange={handleBranchChange} disabled={!selectedTA} className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 shadow-sm disabled:bg-slate-50 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none">
                         <option value="">-- เลือกรหัส - ชื่อสาขา --</option>
-                        {BRANCHES.map(branch => <option key={branch.code} value={branch.code}>[{branch.area}] {branch.code} - {branch.name}</option>)}
+                        {appBranches.map(branch => <option key={branch.code} value={branch.code}>[{branch.area}] {branch.code} - {branch.name}</option>)}
                       </select>
                     </div>
                   </div>
