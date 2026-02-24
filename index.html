@@ -55,13 +55,13 @@
     // --- MOCK DATA ---
     const DEFAULT_TAS = ['TA 1 (คุณเอ)', 'TA 2 (คุณบี)', 'TA 3 (คุณซี)', 'TA 4 (คุณดี)'];
     const DEFAULT_POSITIONS = [
-      { position: 'ผู้จัดการสาขา', recruit: '' },
-      { position: 'ผู้ช่วยผู้จัดการสาขา', recruit: '' },
-      { position: 'พนักงานขาย', recruit: '' },
-      { position: 'พนักงานแคชเชียร์', recruit: '' },
-      { position: 'พนักงานจัดเรียงสินค้า', recruit: '' },
-      { position: 'พนักงานธุรการ', recruit: '' },
-      { position: 'บัญชี', recruit: '' }
+      { position: 'ผู้จัดการสาขา', recruit: '', area: '' },
+      { position: 'ผู้ช่วยผู้จัดการสาขา', recruit: '', area: '' },
+      { position: 'พนักงานขาย', recruit: '', area: '' },
+      { position: 'พนักงานแคชเชียร์', recruit: '', area: '' },
+      { position: 'พนักงานจัดเรียงสินค้า', recruit: '', area: '' },
+      { position: 'พนักงานธุรการ', recruit: '', area: '' },
+      { position: 'บัญชี', recruit: '', area: '' }
     ];
 
     // ดึงข้อมูลสาขาจาก CSV ที่ระบบอ่านได้เบื้องต้น
@@ -131,7 +131,7 @@
       const [appPositions, setAppPositions] = useState([]);
       
       // --- STATE: UI Modals ---
-      const [showSettings, setShowSettings] = useState(false); // ควบคุมหน้าต่างตั้งค่า
+      const [showSettings, setShowSettings] = useState(false);
 
       // --- STATE: HR Recruit ---
       const [selectedTA, setSelectedTA] = useState('');
@@ -160,12 +160,21 @@
 
       const [dashboardTA, setDashboardTA] = useState('ALL');
 
+      // กรองชื่อตำแหน่งไม่ให้ซ้ำกัน เพื่อใช้แสดงใน Dropdown ให้ Area HR เลือกเปิดงาน
+      const uniquePositionNames = useMemo(() => {
+        return [...new Set(appPositions.map(p => p.position))];
+      }, [appPositions]);
+
       // --- EFFECTS: Load Data from Google Sheets ---
       useEffect(() => {
         const normalizePositions = (positions) => {
           return positions.map(p => {
-            if (typeof p === 'string') return { position: p, recruit: '' };
-            return { position: String(p.position || p.name || ''), recruit: String(p.recruit || '') };
+            if (typeof p === 'string') return { position: p, recruit: '', area: '' };
+            return { 
+              position: String(p.position || p.name || '').trim(), 
+              recruit: String(p.recruit || '').trim(),
+              area: String(p.area || '').trim() 
+            };
           });
         };
 
@@ -227,6 +236,7 @@
         initLoad();
       }, []);
 
+      // สร้างรายชื่อ Area ให้เรียงตามตัวเลข
       useEffect(() => {
         if (appBranches.length > 0) {
           const uniqueAreas = [...new Set(appBranches.map(b => String(b.area)))].sort((a,b) => {
@@ -332,7 +342,7 @@
             const data = XLSX.utils.sheet_to_json(wb.Sheets[wsname], { header: 1 });
             
             const newPositions = [];
-            const newTAsSet = new Set(appTAs); // ดึง TA เดิมมาไว้ก่อน เพื่อไม่ให้ของเก่าหาย
+            const newTAsSet = new Set(appTAs);
             let foundNewTA = false;
 
             for (let i = 1; i < data.length; i++) {
@@ -340,9 +350,10 @@
               if (row && row[0]) {
                 const posName = String(row[0]).replace(/\r/g, '').trim();
                 const recruitName = row[1] ? String(row[1]).replace(/\r/g, '').trim() : '';
+                const areaName = row[2] ? String(row[2]).replace(/\r/g, '').trim() : '';
                 
                 if (posName) {
-                  newPositions.push({ position: posName, recruit: recruitName });
+                  newPositions.push({ position: posName, recruit: recruitName, area: areaName });
                   if (recruitName && !newTAsSet.has(recruitName)) {
                     newTAsSet.add(recruitName);
                     foundNewTA = true;
@@ -364,7 +375,7 @@
               syncMasterToCloud(appBranches, updatedTAs, newPositions);
               
               if (foundNewTA) {
-                alert(`อัปเดตตำแหน่งงานสำเร็จ!\n- นำเข้าตำแหน่งทั้งหมด ${newPositions.length} รายการ\n- อัปเดตรายชื่อ TA ให้อัตโนมัติ (พบรายชื่อใหม่)`);
+                alert(`อัปเดตตำแหน่งงานสำเร็จ!\n- นำเข้าตำแหน่งและเงื่อนไข Area ทั้งหมด ${newPositions.length} รายการ\n- อัปเดตรายชื่อ TA ให้อัตโนมัติ (พบรายชื่อใหม่)`);
               } else {
                 alert(`อัปเดตตำแหน่งงานและผู้รับผิดชอบสำเร็จ! นำเข้าทั้งหมด ${newPositions.length} รายการ`);
               }
@@ -535,7 +546,18 @@
         setVacancies(newVacs);
         setVacancyForm({ branchCode: '', position: '', manualStatus: 'Vacant' });
         
+        // ส่งบันทึกขึ้นชีต และส่งอีเมล
         syncToCloud(applicants, newVacs);
+        if (GOOGLE_SCRIPT_URL) {
+          try {
+            fetch(GOOGLE_SCRIPT_URL, {
+              method: 'POST',
+              mode: 'no-cors',
+              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify({ action: 'notifyNewVacancy', vacancy: newVacancy })
+            });
+          } catch (error) { console.error('Email Error:', error); }
+        }
       };
 
       const deleteVacancy = (id) => {
@@ -590,26 +612,38 @@
         return { applicantCount, computedStatus, slaDays, matchedApplicants };
       };
 
-      // สำหรับแท็บ Recruit: กรองตำแหน่งงานที่ยังไม่ปิดรับ
+      // 🧠 หัวใจสำคัญ: กรองตำแหน่งงานให้ Recruit ดู (เงื่อนไข 2 ชั้น: ตำแหน่ง + Area)
       const activeVacanciesForRecruit = useMemo(() => {
         return vacancies.filter(v => {
           if (v.manualStatus === 'Closed') return false;
           if (recruitAreaFilter && String(v.area) !== String(recruitAreaFilter)) return false;
           if (recruitBranchFilter && String(v.branchCode) !== String(recruitBranchFilter)) return false;
 
-          // กรองตาม TA (Recruit) ที่ผูกไว้กับตำแหน่งอัจฉริยะ!
           if (selectedTA) {
-            const posInfo = appPositions.find(p => String(p.position).trim() === String(v.position).trim());
+            // 1. ลองหาเงื่อนไขแบบ "ระบุ Area ชัดเจน" ก่อน
+            let posInfo = appPositions.find(p => 
+              String(p.position).trim() === String(v.position).trim() && 
+              p.area && String(p.area).trim() === String(v.area).trim()
+            );
+
+            // 2. ถ้าไม่เจอแบบระบุ Area ให้หากฎแบบ "เว้นว่าง Area (เหมาหมด)"
+            if (!posInfo) {
+              posInfo = appPositions.find(p => 
+                String(p.position).trim() === String(v.position).trim() && 
+                (!p.area || String(p.area).trim() === '')
+              );
+            }
+
             const assignedRecruit = posInfo && posInfo.recruit ? String(posInfo.recruit).trim() : '';
             const currentTA = String(selectedTA).trim();
 
             if (assignedRecruit !== '') {
-               // ถ้ามีการระบุชื่อไว้ ต้องตรงกันเป๊ะๆ ถึงจะเห็น
+               // ถ้าตำแหน่งนี้มีเจ้าของ (ถูกผูกชื่อไว้) คนเปิดดูต้องเป็นคนนั้นเท่านั้น
                if (assignedRecruit.toLowerCase() !== currentTA.toLowerCase()) {
                  return false;
                }
             }
-            // ถ้า assignedRecruit เป็นค่าว่าง ('') แปลว่ายังไม่ได้ผูกกับใคร ให้แสดงเป็นกองกลาง (ทุกคนเห็นได้)
+            // ถ้า assignedRecruit ว่างเปล่า = ตำแหน่งกองกลาง ให้ทุกคนเห็นผ่านไปได้เลย
           }
 
           return true;
@@ -761,7 +795,7 @@
                           <label className="block text-sm font-semibold text-slate-700 mb-2">2. ตำแหน่งงาน <span className="text-red-500">*</span></label>
                           <select required name="position" value={vacancyForm.position} onChange={handleVacancyInputChange} className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none">
                             <option value="">-- เลือกตำแหน่งงาน --</option>
-                            {appPositions.map(pos => <option key={pos.position} value={pos.position}>{pos.position}</option>)}
+                            {uniquePositionNames.map(pos => <option key={pos} value={pos}>{pos}</option>)}
                           </select>
                         </div>
                         <div>
@@ -827,7 +861,7 @@
                                     </td>
                                     <td className="px-3 py-3">
                                       <select value={editVacForm.position} onChange={(e) => setEditVacForm({...editVacForm, position: e.target.value})} className="w-full text-xs font-semibold border-slate-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm">
-                                        {appPositions.map(pos => <option key={pos.position} value={pos.position}>{pos.position}</option>)}
+                                        {uniquePositionNames.map(pos => <option key={pos} value={pos}>{pos}</option>)}
                                       </select>
                                     </td>
                                     <td className="px-3 py-3 text-center text-slate-400 text-xs">- ออโต้ -</td>
@@ -1390,7 +1424,7 @@
                         <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg group-hover:bg-indigo-100 transition-colors"><Briefcase size={20} /></div>
                         <div className="text-left">
                           <span className="block text-sm font-bold text-slate-700">อัปเดตไฟล์ตำแหน่ง-Recruit</span>
-                          <span className="block text-xs text-slate-500">รูปแบบ: ชื่อตำแหน่ง, ผู้รับผิดชอบ (TA)</span>
+                          <span className="block text-xs text-slate-500">รูปแบบ: ชื่อตำแหน่ง, TA, Area (เว้นได้)</span>
                         </div>
                       </div>
                       <Upload size={18} className="text-slate-400 group-hover:text-indigo-500 transition-colors" />
