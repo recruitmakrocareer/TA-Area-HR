@@ -620,30 +620,34 @@
           if (recruitBranchFilter && String(v.branchCode) !== String(recruitBranchFilter)) return false;
 
           if (selectedTA) {
-            // 1. ลองหาเงื่อนไขแบบ "ระบุ Area ชัดเจน" ก่อน
-            let posInfo = appPositions.find(p => 
-              String(p.position).trim() === String(v.position).trim() && 
-              p.area && String(p.area).trim() === String(v.area).trim()
-            );
+            const currentTA = String(selectedTA).trim().toLowerCase();
+            const vacPos = String(v.position).trim();
+            const vacArea = String(v.area).trim().toLowerCase();
 
-            // 2. ถ้าไม่เจอแบบระบุ Area ให้หากฎแบบ "เว้นว่าง Area (เหมาหมด)"
-            if (!posInfo) {
-              posInfo = appPositions.find(p => 
-                String(p.position).trim() === String(v.position).trim() && 
-                (!p.area || String(p.area).trim() === '')
-              );
+            // ค้นหากฎทั้งหมดของตำแหน่งนี้
+            const posRules = appPositions.filter(p => String(p.position).trim() === vacPos);
+
+            if (posRules.length > 0) {
+              // 1. ลองหาเงื่อนไขแบบ "ระบุ Area" โดยรองรับกรณีที่มีหลาย Area ในช่องเดียว (เช่น "Area 1, Area 4")
+              let matchingRule = posRules.find(p => {
+                if (!p.area || String(p.area).trim() === '') return false;
+                const ruleAreas = String(p.area).split(',').map(a => a.trim().toLowerCase());
+                return ruleAreas.includes(vacArea);
+              });
+
+              // 2. ถ้าไม่เจอแบบระบุ Area ให้หากฎแบบ "เว้นว่าง Area (เหมาหมด)"
+              if (!matchingRule) {
+                matchingRule = posRules.find(p => !p.area || String(p.area).trim() === '');
+              }
+
+              if (matchingRule) {
+                const assignedRecruit = String(matchingRule.recruit).trim().toLowerCase();
+                // ถ้ามีการระบุชื่อไว้ และไม่ตรงกับ TA ปัจจุบัน ให้ซ่อนทิ้งไป
+                if (assignedRecruit !== '' && assignedRecruit !== currentTA) {
+                  return false;
+                }
+              }
             }
-
-            const assignedRecruit = posInfo && posInfo.recruit ? String(posInfo.recruit).trim() : '';
-            const currentTA = String(selectedTA).trim();
-
-            if (assignedRecruit !== '') {
-               // ถ้าตำแหน่งนี้มีเจ้าของ (ถูกผูกชื่อไว้) คนเปิดดูต้องเป็นคนนั้นเท่านั้น
-               if (assignedRecruit.toLowerCase() !== currentTA.toLowerCase()) {
-                 return false;
-               }
-            }
-            // ถ้า assignedRecruit ว่างเปล่า = ตำแหน่งกองกลาง ให้ทุกคนเห็นผ่านไปได้เลย
           }
 
           return true;
