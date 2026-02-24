@@ -1134,6 +1134,7 @@
               </div>
             )}
             
+            {/* Modal: View Applicants (Popup รายชื่อผู้สมัครเมื่อกดจากตาราง Area HR) */}
             {viewApplicants && (
                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
                  <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden">
@@ -1149,13 +1150,26 @@
                        {viewApplicants.list.map(app => (
                          <div key={app.id} className="p-4 rounded-xl border border-slate-100 flex justify-between items-center hover:border-blue-200 transition-colors">
                            <div className="flex items-start space-x-3">
-                             <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold">{app.name.charAt(0)}</div>
+                             <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold shrink-0">{app.name.charAt(0)}</div>
                              <div>
                                <p className="font-bold text-slate-900">{app.name}</p>
-                               <p className="text-sm text-slate-500 flex items-center mt-0.5"><Phone size={12} className="mr-1"/> {app.phone}</p>
+                               <div className="flex flex-wrap items-center gap-2 mt-1">
+                                 <p className="text-sm text-slate-500 flex items-center"><Phone size={12} className="mr-1"/> {app.phone}</p>
+                                 
+                                 {/* เพิ่มปุ่ม Preview หรือสถานะไฟล์แนบ ตรงนี้ครับ */}
+                                 {app.resumeBase64 && (
+                                   <button 
+                                     onClick={() => setPreviewFile({ base64: app.resumeBase64, name: app.resumeName })}
+                                     className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md border border-blue-200 flex items-center hover:bg-blue-600 hover:text-white transition-colors"
+                                     title="ดูตัวอย่างเรซูเม่"
+                                   >
+                                     <Eye size={12} className="mr-1"/> เรซูเม่
+                                   </button>
+                                 )}
+                               </div>
                              </div>
                            </div>
-                           <div className="text-right">
+                           <div className="text-right shrink-0">
                              <span className="inline-block px-2.5 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: `${STATUS_COLORS[app.status]}15`, color: STATUS_COLORS[app.status] }}>{app.status}</span>
                              <p className="text-[10px] text-slate-400 mt-1">โดย {app.ta}</p>
                            </div>
@@ -1167,7 +1181,7 @@
                </div>
              )}
 
-            {/* Modal: Preview File */}
+            {/* Modal: Preview File (แสดงไฟล์เรซูเม่) */}
             {previewFile && (
               <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
                 <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden">
