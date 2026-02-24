@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HR Recruitment Workspace</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Babel for JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- SheetJS for Excel Export -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #F8FAFC; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- React Code -->
+  <script type="text/babel" data-type="module">
+    import React, { useState, useMemo, useEffect } from 'https://esm.sh/react@18.2.0';
+    import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
+    import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'https://esm.sh/recharts@2.12.0?deps=react@18.2.0,react-dom@18.2.0';
+    import { Users, UserPlus, BarChart3, Building2, CheckCircle2, Clock, MapPin, Search, AlertCircle, FileText, Briefcase, Phone, MessageSquare, Map, Target, Edit, Trash2, X, BellRing, Download, Paperclip } from 'https://esm.sh/lucide-react@0.344.0?deps=react@18.2.0';
+
+    // ==========================================
+    // ⚙️ การตั้งค่า GOOGLE SHEETS API
+    // นำ Web App URL ของ Google Apps Script มาวางที่นี่
+    // ==========================================
+    const GOOGLE_SCRIPT_URL = ""; 
+
+    // --- MOCK DATA (Fallback) ---
+    const TA_LIST = ['TA 1 (คุณเอ)', 'TA 2 (คุณบี)', 'TA 3 (คุณซี)', 'TA 4 (คุณดี)'];
+    const AREAS = Array.from({ length: 14 }, (_, i) => `Area ${i + 1}`);
+
+    const BRANCHES = [
+      { code: 'HQ001', name: 'สำนักงานใหญ่ (Head Office)', area: 'Area 1' },
+      { code: 'BKK02', name: 'สาขาสุขุมวิท', area: 'Area 1' },
+      { code: 'BKK03', name: 'สาขาสีลม', area: 'Area 2' },
+      { code: 'CNX01', name: 'สาขาเชียงใหม่', area: 'Area 8' },
+      { code: 'HKT01', name: 'สาขาภูเก็ต', area: 'Area 14' },
+    ];
+
+    const STATUSES = ['รอสัมภาษณ์', 'ไม่เข้าสัมภาษณ์', 'ผ่าน', 'ไม่ผ่าน', 'สำรอง', 'ตรวจสุขภาพ', 'รอเริ่มงาน', 'มาเริ่มงาน', 'ไม่มาเริ่มงาน', 'อื่นๆ'];
+    const VACANCY_STATUSES = ['Vacant', 'Promote&Transfer', 'Hold', 'Closed'];
+
+    const STATUS_COLORS = { 'รอสัมภาษณ์': '#F59E0B', 'ไม่เข้าสัมภาษณ์': '#64748B', 'ผ่าน': '#10B981', 'ไม่ผ่าน': '#EF4444', 'สำรอง': '#3B82F6', 'ตรวจสุขภาพ': '#8B5CF6', 'รอเริ่มงาน': '#0EA5E9', 'มาเริ่มงาน': '#059669', 'ไม่มาเริ่มงาน': '#94A3B8', 'อื่นๆ': '#F97316' };
+    const VACANCY_COLORS = { 'Vacant': '#F59E0B', 'Promote&Transfer': '#8B5CF6', 'Hold': '#64748B', 'Closed': '#94A3B8', 'รอตรวจสุขภาพ': '#0EA5E9', 'Hiring': '#10B981' };
+
+    function App() {
+      const [activeTab, setActiveTab] = useState('area_hr');
+      const [isLoading, setIsLoading] = useState(false);
+      
+      // --- STATE: HR Recruit ---
+      const [selectedTA, setSelectedTA] = useState('');
+      const [selectedBranchCode, setSelectedBranchCode] = useState('');
+      const [formData, setFormData] = useState({ name: '', phone: '', position: '', status: '', comment: '', resumeName: '', resumeBase64: '' });
+      const [editingApplicant, setEditingApplicant] = useState(null);
+
+      const [applicants, setApplicants] = useState([
+        { id: 1, ta: 'TA 1 (คุณเอ)', branchCode: 'HQ001', branchName: 'สำนักงานใหญ่ (Head Office)', name: 'สมชาย ใจดี', phone: '081-234-5678', position: 'พนักงานขาย', status: 'ตรวจสุขภาพ', comment: '', timestamp: new Date(Date.now() - 86400000).toLocaleString('th-TH') }
+      ]);
+
+      // --- STATE: Area HR ---
+      const [selectedAreas, setSelectedAreas] = useState([]);
+      const [vacancyForm, setVacancyForm] = useState({ branchCode: '', position: '', manualStatus: 'Vacant' });
+      const [editingVacancy, setEditingVacancy] = useState(null);
+      const [viewApplicants, setViewApplicants] = useState(null);
+      
+      const [vacancies, setVacancies] = useState([
+        { id: 1, area: 'Area 1', branchCode: 'HQ001', branchName: 'สำนักงานใหญ่ (Head Office)', position: 'พนักงานขาย', manualStatus: 'Vacant', createdAt: Date.now() - (7 * 86400000), timestamp: new Date(Date.now() - (7 * 86400000)).toLocaleString('th-TH') }
+      ]);
+
+      const [dashboardTA, setDashboardTA] = useState('ALL');
+
+      // --- EFFECTS: Load Data ---
+      useEffect(() => {
+        // จำลองการดึงข้อมูลจาก LocalStorage หรือ Google Sheets
+        const loadData = async () => {
+          setIsLoading(true);
+          if (GOOGLE_SCRIPT_URL) {
+            try {
+              // Fetch from Google Sheet logic here
+              // const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=getData`);
+              // const data = await response.json();
+              // setApplicants(data.applicants); setVacancies(data.vacancies);
+            } catch (error) { console.error("Failed to load from Google Sheets", error); }
+          } else {
+            const localApps = localStorage.getItem('hr_applicants');
+            const localVacs = localStorage.getItem('hr_vacancies');
+            if(localApps) setApplicants(JSON.parse(localApps));
+            if(localVacs) setVacancies(JSON.parse(localVacs));
+          }
+          setIsLoading(false);
+        };
+        loadData();
+      }, []);
+
+      useEffect(() => {
+        if(!GOOGLE_SCRIPT_URL) {
+          localStorage.setItem('hr_applicants', JSON.stringify(applicants));
+          localStorage.setItem('hr_vacancies', JSON.stringify(vacancies));
+        }
+      }, [applicants, vacancies]);
+
+      // --- EXPORT EXCEL ---
+      const exportToExcel = (dataList, filename) => {
+        const worksheet = XLSX.utils.json_to_sheet(dataList);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
+        XLSX.writeFile(workbook, `${filename}.xlsx`);
+      };
+
+      // --- HANDLERS: HR Recruit ---
+      const handleBranchChange = (e) => setSelectedBranchCode(e.target.value);
+      const handleInputChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+      
+      const handleFileUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setFormData(prev => ({ ...prev, resumeBase64: reader.result, resumeName: file.name }));
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+      
+      const handleRecruitSubmit = async (e) => {
+        e.preventDefault();
+        if (!selectedTA || !selectedBranchCode) { alert('กรุณาเลือก TA และ สาขาก่อนบันทึกข้อมูล'); return; }
+        const branch = BRANCHES.find(b => b.code === selectedBranchCode);
+        const newRecord = { id: Date.now(), ta: selectedTA, branchCode: branch.code, branchName: branch.name, ...formData, timestamp: new Date().toLocaleString('th-TH') };
+        
+        setApplicants([newRecord, ...applicants]);
+        setFormData({ name: '', phone: '', position: '', status: '', comment: '', resumeName: '', resumeBase64: '' });
+        
+        if (GOOGLE_SCRIPT_URL) {
+           // send to Google Sheet via POST
+        }
+      };
+
+      const deleteApplicant = (id) => {
+        if (window.confirm('คุณแน่ใจหรือไม่ที่จะลบข้อมูลผู้สมัครรายนี้?')) setApplicants(applicants.filter(a => a.id !== id));
+      };
+
+      const submitEditApplicant = (e) => {
+        e.preventDefault();
+        setApplicants(applicants.map(a => a.id === editingApplicant.id ? editingApplicant : a));
+        setEditingApplicant(null);
+      };
+
+      // --- HANDLERS: Area HR ---
+      const toggleArea = (area) => {
+        setSelectedAreas(prev => prev.includes(area) ? prev.filter(a => a !== area) : [...prev, area]);
+        setVacancyForm(prev => ({...prev, branchCode: ''}));
+      };
+      const handleVacancyInputChange = (e) => setVacancyForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+
+      const handleVacancySubmit = (e) => {
+        e.preventDefault();
+        const branch = BRANCHES.find(b => b.code === vacancyForm.branchCode);
+        if (!branch) return;
+
+        const isDuplicate = vacancies.some(v => v.branchCode === branch.code && v.position === vacancyForm.position && v.manualStatus !== 'Closed');
+        if (isDuplicate) { alert(`มีตำแหน่ง "${vacancyForm.position}" เปิดรับในสาขานี้อยู่แล้ว!`); return; }
+
+        const newVacancy = { id: Date.now(), area: branch.area, branchCode: branch.code, branchName: branch.name, position: vacancyForm.position, manualStatus: vacancyForm.manualStatus, createdAt: Date.now(), timestamp: new Date().toLocaleString('th-TH') };
+        setVacancies([newVacancy, ...vacancies]);
+        setVacancyForm({ branchCode: '', position: '', manualStatus: 'Vacant' });
+      };
+
+      const deleteVacancy = (id) => {
+        if (window.confirm('คุณแน่ใจหรือไม่ที่จะลบตำแหน่งงานนี้?')) setVacancies(vacancies.filter(v => v.id !== id));
+      };
+
+      const submitEditVacancy = (e) => {
+        e.preventDefault();
+        const isDuplicate = vacancies.some(v => v.id !== editingVacancy.id && v.branchCode === editingVacancy.branchCode && v.position === editingVacancy.position && v.manualStatus !== 'Closed');
+        if (isDuplicate) { alert(`มีตำแหน่ง "${editingVacancy.position}" เปิดรับในสาขานี้อยู่แล้ว!`); return; }
+        
+        const branch = BRANCHES.find(b => b.code === editingVacancy.branchCode);
+        setVacancies(vacancies.map(v => v.id === editingVacancy.id ? { ...editingVacancy, area: branch.area, branchName: branch.name } : v));
+        setEditingVacancy(null);
+      };
+
+      const closeVacancy = (id) => setVacancies(vacancies.map(v => v.id === id ? { ...v, manualStatus: 'Closed' } : v));
+
+      // --- DERIVED DATA ---
+      const availableBranchesForAreas = BRANCHES.filter(b => selectedAreas.includes(b.area));
+      const filteredVacancies = vacancies.filter(v => selectedAreas.length === 0 || selectedAreas.includes(v.area));
+
+      const getVacancyInsights = (branchCode, position, manualStatus, createdAt) => {
+        const matchedApplicants = applicants.filter(app => app.branchCode === branchCode && app.position === position);
+        const applicantCount = matchedApplicants.length;
+        let computedStatus = manualStatus;
+        if (manualStatus !== 'Closed') {
+          if (matchedApplicants.some(app => app.status === 'มาเริ่มงาน')) computedStatus = 'Hiring';
+          else if (matchedApplicants.some(app => app.status === 'ตรวจสุขภาพ')) computedStatus = 'รอตรวจสุขภาพ';
+        }
+        const slaDays = Math.max(0, Math.floor((Date.now() - createdAt) / (1000 * 60 * 60 * 24)));
+        return { applicantCount, computedStatus, slaDays, matchedApplicants };
+      };
+
+      const selectedBranch = BRANCHES.find(b => b.code === selectedBranchCode);
+      const filteredEntryList = applicants.filter(app => (!selectedTA || app.ta === selectedTA) && (!selectedBranchCode || app.branchCode === selectedBranchCode));
+      const dashboardData = useMemo(() => dashboardTA === 'ALL' ? applicants : applicants.filter(app => app.ta === dashboardTA), [applicants, dashboardTA]);
+      const statusChartData = useMemo(() => {
+        const counts = {}; dashboardData.forEach(app => counts[app.status] = (counts[app.status] || 0) + 1);
+        return Object.keys(counts).map(key => ({ name: key, value: counts[key] })).sort((a, b) => b.value - a.value);
+      }, [dashboardData]);
+      const branchChartData = useMemo(() => {
+        const counts = {}; dashboardData.forEach(app => counts[app.branchName] = (counts[app.branchName] || 0) + 1);
+        return Object.keys(counts).map(key => ({ name: key, count: counts[key] })).sort((a, b) => b.count - a.count);
+      }, [dashboardData]);
+
+
+      // --- COMPONENTS ---
+      return (
+        <div className="min-h-screen font-sans text-slate-800 pb-10">
+          
+          {/* Navbar */}
+          <nav className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex flex-col md:flex-row justify-between h-auto md:h-16 py-3 md:py-0">
+                <div className="flex items-center space-x-3 mb-3 md:mb-0">
+                  <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-sm">
+                    <Users size={20} strokeWidth={2.5} />
+                  </div>
+                  <span className="text-xl font-bold text-slate-900 tracking-tight">HR <span className="text-blue-600 font-black">Recruit</span></span>
+                </div>
+                
+                {/* Tabs */}
+                <div className="flex items-center overflow-x-auto pb-1 md:pb-0 hide-scrollbar">
+                  <div className="flex space-x-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/60 whitespace-nowrap">
+                    <button onClick={() => setActiveTab('area_hr')} className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === 'area_hr' ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-900/5' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}>
+                      <Briefcase size={16} strokeWidth={activeTab === 'area_hr' ? 2.5 : 2} /><span>Area HR (ตำแหน่งงาน)</span>
+                    </button>
+                    <button onClick={() => setActiveTab('entry')} className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === 'entry' ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-900/5' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}>
+                      <UserPlus size={16} strokeWidth={activeTab === 'entry' ? 2.5 : 2} /><span>Recruit (คีย์ผู้สมัคร)</span>
+                    </button>
+                    <button onClick={() => setActiveTab('dashboard')} className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === 'dashboard' ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-900/5' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}>
+                      <BarChart3 size={16} strokeWidth={activeTab === 'dashboard' ? 2.5 : 2} /><span>แดชบอร์ดสรุปผล</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </nav>
+
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            
+            {/* --- TAB: AREA HR --- */}
+            {activeTab === 'area_hr' && (
+              <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500 relative">
+                
+                {/* Area Select (Improved Grid Layout) */}
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8">
+                  <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-lg font-bold text-slate-900 flex items-center space-x-2">
+                        <Map className="text-blue-600" size={22} /><span>เลือกพื้นที่รับผิดชอบ (Area Selection)</span>
+                      </h2>
+                      <p className="text-sm text-slate-500 mt-1 ml-7">คลิกเพื่อเลือก Area ที่ต้องการจัดการ (เลือกได้มากกว่า 1)</p>
+                    </div>
+                    <div className="text-sm font-semibold text-blue-600 bg-blue-50 px-4 py-2 rounded-xl border border-blue-100 shadow-sm">
+                      เลือกอยู่ <span className="text-lg mx-1">{selectedAreas.length}</span> Area
+                    </div>
+                  </div>
+                  
+                  {/* BEAUTIFUL GRID LAYOUT FOR AREAS */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+                    {AREAS.map(area => {
+                      const isSelected = selectedAreas.includes(area);
+                      return (
+                        <button 
+                          key={area} 
+                          onClick={() => toggleArea(area)} 
+                          className={`flex items-center justify-center px-2 py-3 rounded-xl text-sm font-bold border transition-all duration-200 transform hover:scale-[1.02] active:scale-95 ${
+                            isSelected 
+                              ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white border-blue-600 shadow-md shadow-blue-500/30' 
+                              : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300 hover:bg-blue-50/50 hover:text-blue-700 shadow-sm'
+                          }`}
+                        >
+                          {area}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Form Add Vacancy */}
+                {selectedAreas.length > 0 && (
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="bg-slate-50/50 border-b border-slate-100 px-6 py-5 flex items-center space-x-3">
+                      <div className="bg-blue-100 text-blue-600 p-2 rounded-lg"><Target size={20} strokeWidth={2} /></div>
+                      <h2 className="text-lg font-bold text-slate-900">เปิดตำแหน่งงานว่างใหม่</h2>
+                    </div>
+                    <form onSubmit={handleVacancySubmit} className="p-6 space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">1. รหัส-ชื่อสาขา <span className="text-red-500">*</span></label>
+                          <select required name="branchCode" value={vacancyForm.branchCode} onChange={handleVacancyInputChange} className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none">
+                            <option value="">-- เลือกสาขาใน Area ที่กำหนด --</option>
+                            {availableBranchesForAreas.map(b => <option key={b.code} value={b.code}>[{b.area}] {b.code} - {b.name}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">2. ตำแหน่งงาน <span className="text-red-500">*</span></label>
+                          <input required type="text" name="position" value={vacancyForm.position} onChange={handleVacancyInputChange} placeholder="เช่น พนักงานขาย" className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none placeholder:text-slate-400" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">3. สถานะเริ่มต้น <span className="text-red-500">*</span></label>
+                          <select required name="manualStatus" value={vacancyForm.manualStatus} onChange={handleVacancyInputChange} className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none">
+                            {VACANCY_STATUSES.filter(s => s !== 'Closed').map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="flex justify-end pt-2">
+                        <button type="submit" className="bg-slate-800 hover:bg-slate-900 text-white font-semibold py-2.5 px-6 rounded-xl shadow-sm flex items-center space-x-2 transition-colors">
+                          <Briefcase size={16} /><span>บันทึกตำแหน่งงาน</span>
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+
+                {/* Table Vacancies */}
+                {selectedAreas.length > 0 && (
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-white flex-wrap gap-4">
+                      <div>
+                        <h3 className="font-bold text-slate-900 text-lg">รายการตำแหน่งงาน (Job Vacancies)</h3>
+                        <p className="text-sm text-slate-500 mt-0.5">กดที่จำนวนผู้สมัครเพื่อดูรายชื่อ</p>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <span className="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-2 rounded-lg border border-slate-200">
+                          ทั้งหมด <span className="text-blue-600 text-sm mx-1">{filteredVacancies.length}</span> รายการ
+                        </span>
+                        {/* EXPORT BUTTON */}
+                        <button onClick={() => exportToExcel(filteredVacancies, 'Vacancies_Export')} className="flex items-center space-x-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 text-xs font-bold px-3 py-2 rounded-lg transition-colors shadow-sm">
+                          <Download size={14} /><span>Export Excel</span>
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm text-left whitespace-nowrap">
+                        <thead className="bg-slate-50/80 border-b border-slate-100">
+                          <tr>
+                            <th className="px-5 py-3.5 font-semibold text-slate-600 uppercase text-xs">Area / สาขา</th>
+                            <th className="px-5 py-3.5 font-semibold text-slate-600 uppercase text-xs">ตำแหน่งงาน</th>
+                            <th className="px-5 py-3.5 font-semibold text-slate-600 uppercase text-xs text-center">SLA</th>
+                            <th className="px-5 py-3.5 font-semibold text-slate-600 uppercase text-xs text-center">ผู้สมัคร</th>
+                            <th className="px-5 py-3.5 font-semibold text-slate-600 uppercase text-xs">สถานะงาน</th>
+                            <th className="px-5 py-3.5 font-semibold text-slate-600 uppercase text-xs text-right">จัดการ</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {filteredVacancies.length === 0 ? (
+                            <tr><td colSpan="6" className="px-6 py-12 text-center text-slate-400">ยังไม่มีข้อมูลสำหรับ Area ที่เลือก</td></tr>
+                          ) : (
+                            filteredVacancies.map((v) => {
+                              const { applicantCount, computedStatus, slaDays, matchedApplicants } = getVacancyInsights(v.branchCode, v.position, v.manualStatus, v.createdAt);
+                              const isHiringAlert = computedStatus === 'Hiring' && v.manualStatus !== 'Closed';
+
+                              return (
+                                <tr key={v.id} className={`transition-colors ${isHiringAlert ? 'bg-emerald-50/40 hover:bg-emerald-50' : 'hover:bg-slate-50/50'}`}>
+                                  <td className="px-5 py-4">
+                                    <div className="text-xs font-bold text-blue-600 mb-0.5">{v.area}</div>
+                                    <div className="font-semibold text-slate-900">{v.branchName}</div>
+                                    <div className="text-xs text-slate-400">{v.branchCode}</div>
+                                  </td>
+                                  <td className="px-5 py-4 text-slate-800 font-bold">{v.position}</td>
+                                  
+                                  <td className="px-5 py-4 text-center">
+                                    <div className={`inline-flex flex-col items-center justify-center min-w-[40px] ${slaDays > 30 ? 'text-red-500' : 'text-slate-600'}`}>
+                                      <span className="font-black text-base">{slaDays}</span>
+                                      <span className="text-[10px] font-semibold uppercase">วัน</span>
+                                    </div>
+                                  </td>
+
+                                  <td className="px-5 py-4 text-center">
+                                    <button 
+                                      onClick={() => setViewApplicants({ position: v.position, branchName: v.branchName, list: matchedApplicants })}
+                                      disabled={applicantCount === 0}
+                                      className={`inline-flex items-center justify-center min-w-[36px] h-9 rounded-xl font-bold text-sm border transition-all ${
+                                        applicantCount > 0 
+                                          ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-600 hover:text-white hover:shadow-md cursor-pointer' 
+                                          : 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed'
+                                      }`}
+                                    >
+                                      {applicantCount}
+                                    </button>
+                                  </td>
+
+                                  <td className="px-5 py-4">
+                                    <div className="flex flex-col items-start gap-1">
+                                      <div className="flex items-center space-x-2">
+                                        <div className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold"
+                                          style={{ backgroundColor: `${VACANCY_COLORS[computedStatus] || '#475569'}15`, color: VACANCY_COLORS[computedStatus] || '#475569', border: `1px solid ${VACANCY_COLORS[computedStatus] || '#475569'}30` }}
+                                        >
+                                          <span className="w-1.5 h-1.5 rounded-full mr-1.5" style={{ backgroundColor: VACANCY_COLORS[computedStatus] || '#475569' }}></span>
+                                          {computedStatus}
+                                        </div>
+                                        {isHiringAlert && <BellRing className="w-4 h-4 text-red-500 animate-bounce" />}
+                                      </div>
+                                    </div>
+                                  </td>
+
+                                  <td className="px-5 py-4">
+                                    <div className="flex items-center justify-end space-x-2">
+                                      {isHiringAlert && (
+                                        <button onClick={() => closeVacancy(v.id)} className="flex items-center space-x-1 text-xs bg-red-50 text-red-600 px-2.5 py-1.5 rounded-lg border border-red-200 hover:bg-red-500 hover:text-white transition-colors shadow-sm font-semibold">
+                                          <CheckCircle2 size={14} /><span>ปิดงาน</span>
+                                        </button>
+                                      )}
+                                      <button onClick={() => setEditingVacancy(v)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                                        <Edit size={16} />
+                                      </button>
+                                      <button onClick={() => deleteVacancy(v.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                                        <Trash2 size={16} />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* --- TAB: RECRUIT ENTRY --- */}
+            {activeTab === 'entry' && (
+              <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+                
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8">
+                  <div className="mb-6">
+                    <h2 className="text-lg font-bold text-slate-900 flex items-center space-x-2"><MapPin className="text-blue-600" size={22} /><span>ส่วนงานรับผิดชอบ</span></h2>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">ชื่อผู้รับผิดชอบ (TA) <span className="text-red-500">*</span></label>
+                      <select value={selectedTA} onChange={(e) => setSelectedTA(e.target.value)} className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none shadow-sm">
+                        <option value="">-- ระบุ TA --</option>
+                        {TA_LIST.map(ta => <option key={ta} value={ta}>{ta}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">สาขาที่สมัคร <span className="text-red-500">*</span></label>
+                      <select value={selectedBranchCode} onChange={handleBranchChange} disabled={!selectedTA} className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 shadow-sm disabled:bg-slate-50 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none">
+                        <option value="">-- เลือกรหัส - ชื่อสาขา --</option>
+                        {BRANCHES.map(branch => <option key={branch.code} value={branch.code}>[{branch.area}] {branch.code} - {branch.name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {selectedTA && selectedBranchCode && (
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="bg-slate-50/50 border-b border-slate-100 px-6 py-5 flex items-center space-x-3">
+                      <div className="bg-blue-100 text-blue-600 p-2 rounded-lg"><FileText size={20} strokeWidth={2} /></div>
+                      <h2 className="text-lg font-bold text-slate-900">ฟอร์มบันทึกผู้สมัครใหม่</h2>
+                    </div>
+                    <form onSubmit={handleRecruitSubmit} className="p-6 md:p-8 space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                        <div><label className="text-sm font-semibold mb-2 block">1. ชื่อ-นามสกุล <span className="text-red-500">*</span></label><input required type="text" name="name" value={formData.name} onChange={handleInputChange} className="w-full border border-slate-300 rounded-xl px-4 py-2.5 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"/></div>
+                        <div><label className="text-sm font-semibold mb-2 block">2. เบอร์ติดต่อ <span className="text-red-500">*</span></label><input required type="tel" name="phone" value={formData.phone} onChange={handleInputChange} className="w-full border border-slate-300 rounded-xl px-4 py-2.5 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"/></div>
+                        <div><label className="text-sm font-semibold mb-2 block">3. ตำแหน่งงาน <span className="text-red-500">*</span></label><input required type="text" name="position" value={formData.position} onChange={handleInputChange} className="w-full border border-slate-300 rounded-xl px-4 py-2.5 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"/></div>
+                        <div>
+                          <label className="text-sm font-semibold mb-2 block">4. สถานะผู้สมัคร <span className="text-red-500">*</span></label>
+                          <select required name="status" value={formData.status} onChange={handleInputChange} className="w-full border border-slate-300 rounded-xl px-4 py-2.5 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10">
+                            <option value="">-- เลือกสถานะล่าสุด --</option>
+                            {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* UPLOAD RESUME */}
+                      <div>
+                        <label className="text-sm font-semibold mb-2 block">5. อัปโหลดเรซูเม่ (ไม่บังคับ)</label>
+                        <div className="flex items-center space-x-2">
+                           <label className="flex items-center justify-center w-full bg-white border border-slate-300 border-dashed rounded-xl px-4 py-3 hover:bg-slate-50 hover:border-blue-400 cursor-pointer transition-colors shadow-sm">
+                              <Paperclip size={18} className="text-blue-500 mr-2" />
+                              <span className="text-sm text-slate-600 font-medium">{formData.resumeName || 'คลิกเพื่อเลือกไฟล์ (PDF, DOC, DOCX)'}</span>
+                              <input type="file" className="hidden" accept=".pdf,.doc,.docx" onChange={handleFileUpload} />
+                           </label>
+                           {formData.resumeName && (
+                             <button type="button" onClick={() => setFormData(prev => ({...prev, resumeName:'', resumeBase64:''}))} className="p-3 rounded-xl bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
+                               <X size={18}/>
+                             </button>
+                           )}
+                        </div>
+                      </div>
+
+                      {['อื่นๆ', 'ไม่ผ่าน', 'ไม่มาเริ่มงาน'].includes(formData.status) && (
+                        <div className="bg-orange-50/50 p-5 rounded-xl border border-orange-100 animate-in fade-in duration-300">
+                          <label className="text-sm font-semibold text-orange-800 mb-2 block">ระบุเหตุผล <span className="text-red-500">*</span></label>
+                          <textarea required name="comment" value={formData.comment} onChange={handleInputChange} rows="2" className="w-full border border-orange-200 rounded-xl px-4 py-3 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-500/10"></textarea>
+                        </div>
+                      )}
+                      
+                      <div className="pt-4 border-t flex justify-end">
+                        <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-8 rounded-xl font-semibold shadow-sm flex items-center space-x-2 transition-all active:scale-95">
+                          <UserPlus size={18} /><span>บันทึกข้อมูลผู้สมัคร</span>
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+
+                {selectedBranchCode && (
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 mt-8">
+                    <div className="px-6 py-5 border-b flex justify-between items-center flex-wrap gap-4">
+                      <h3 className="font-bold text-lg">ประวัติการบันทึก</h3>
+                      {/* EXPORT BUTTON */}
+                      <button onClick={() => exportToExcel(filteredEntryList, 'Applicants_Export')} className="flex items-center space-x-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 text-xs font-bold px-3 py-2 rounded-lg transition-colors shadow-sm">
+                        <Download size={14} /><span>Export Excel</span>
+                      </button>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm text-left whitespace-nowrap"><thead className="bg-slate-50"><tr><th className="px-6 py-3">ชื่อ-นามสกุล</th><th className="px-6 py-3">ตำแหน่งงาน</th><th className="px-6 py-3">สถานะปัจจุบัน</th><th className="px-6 py-3">ไฟล์แนบ</th><th className="px-6 py-3 text-right">จัดการ</th></tr></thead>
+                      <tbody>
+                        {filteredEntryList.map(app => (
+                          <tr key={app.id} className="border-t hover:bg-slate-50">
+                            <td className="px-6 py-4 font-semibold">{app.name}</td>
+                            <td className="px-6 py-4">{app.position}</td>
+                            <td className="px-6 py-4">
+                              <span className="px-2.5 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: `${STATUS_COLORS[app.status]}15`, color: STATUS_COLORS[app.status] }}>{app.status}</span>
+                              {app.comment && <div className="text-xs text-slate-500 mt-1 max-w-[200px] truncate">เหตุผล: {app.comment}</div>}
+                            </td>
+                            <td className="px-6 py-4">
+                              {app.resumeName ? <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md border flex w-fit items-center"><Paperclip size={12} className="mr-1"/> มีไฟล์</span> : <span className="text-xs text-slate-400">-</span>}
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <div className="flex items-center justify-end space-x-2">
+                                <button onClick={() => setEditingApplicant(app)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="แก้ไข"><Edit size={16} /></button>
+                                <button onClick={() => deleteApplicant(app.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="ลบ"><Trash2 size={16} /></button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody></table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* --- TAB: DASHBOARD --- */}
+            {activeTab === 'dashboard' && (
+               <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500 pb-10">
+                 <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-8 rounded-3xl shadow-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative overflow-hidden">
+                   <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-white opacity-5 rounded-full blur-2xl"></div>
+                   <div className="relative z-10">
+                     <div className="inline-flex items-center space-x-2 bg-white/10 px-3 py-1 rounded-full text-blue-200 text-xs font-semibold mb-3 border border-white/10">
+                       <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
+                       <span>Executive Dashboard</span>
+                     </div>
+                     <h2 className="text-2xl md:text-3xl font-black text-white">รายงานสรุปผลสำหรับผู้บริหาร</h2>
+                     <p className="text-slate-300 mt-1">ภาพรวมการสรรหาบุคลากรและประสิทธิภาพของกระบวนการ</p>
+                   </div>
+                   <div className="relative z-10 w-full md:w-auto">
+                     <label className="block text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider">วิเคราะห์ข้อมูลตาม TA</label>
+                     <div className="flex items-center space-x-3 bg-white/10 backdrop-blur-md p-1.5 rounded-2xl border border-white/20">
+                       <Search size={18} className="text-slate-300 ml-3" />
+                       <select value={dashboardTA} onChange={(e) => setDashboardTA(e.target.value)} className="w-full md:w-56 bg-transparent text-white py-2.5 pr-8 focus:outline-none [&>option]:text-slate-900 font-semibold cursor-pointer">
+                         <option value="ALL">สรุปรวมทั้งหมด (All TAs)</option>
+                         {TA_LIST.map(ta => <option key={ta} value={ta}>{ta}</option>)}
+                       </select>
+                     </div>
+                   </div>
+                 </div>
+     
+                 {/* Executive KPIs */}
+                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                   <div className="bg-white p-7 rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:-translate-y-1 transition-transform">
+                     <div className="flex justify-between items-start mb-4">
+                       <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl"><Users size={24} /></div>
+                       <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-md">Total</span>
+                     </div>
+                     <p className="text-sm font-bold text-slate-500 mb-1">รวมผู้สมัครทั้งหมด</p>
+                     <p className="text-4xl font-black text-slate-900">{dashboardData.length} <span className="text-sm font-semibold text-slate-400">คน</span></p>
+                   </div>
+     
+                   <div className="bg-white p-7 rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:-translate-y-1 transition-transform">
+                     <div className="flex justify-between items-start mb-4">
+                       <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl"><CheckCircle2 size={24} /></div>
+                       <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
+                         {dashboardData.length > 0 ? Math.round((dashboardData.filter(a=>['มาเริ่มงาน','ผ่าน'].includes(a.status)).length / dashboardData.length) * 100) : 0}% Yield
+                       </span>
+                     </div>
+                     <p className="text-sm font-bold text-slate-500 mb-1">สำเร็จ (เริ่มงาน/ผ่าน)</p>
+                     <div className="flex items-baseline space-x-2">
+                       <p className="text-4xl font-black text-slate-900">{dashboardData.filter(a=>['มาเริ่มงาน','ผ่าน'].includes(a.status)).length}</p>
+                     </div>
+                   </div>
+     
+                   <div className="bg-white p-7 rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:-translate-y-1 transition-transform">
+                     <div className="flex justify-between items-start mb-4">
+                       <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl"><Clock size={24} /></div>
+                       <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-md">Pipeline</span>
+                     </div>
+                     <p className="text-sm font-bold text-slate-500 mb-1">รอดำเนินการ</p>
+                     <p className="text-4xl font-black text-slate-900">{dashboardData.filter(a=>['รอสัมภาษณ์','รอเริ่มงาน','ตรวจสุขภาพ'].includes(a.status)).length}</p>
+                   </div>
+     
+                   <div className="bg-white p-7 rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:-translate-y-1 transition-transform">
+                     <div className="flex justify-between items-start mb-4">
+                       <div className="p-3 bg-red-50 text-red-600 rounded-2xl"><AlertCircle size={24} /></div>
+                       <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded-md">
+                         {dashboardData.length > 0 ? Math.round((dashboardData.filter(a=>a.status === 'ไม่ผ่าน').length / dashboardData.length) * 100) : 0}% Loss
+                       </span>
+                     </div>
+                     <p className="text-sm font-bold text-slate-500 mb-1">ไม่ผ่านการพิจารณา</p>
+                     <p className="text-4xl font-black text-slate-900">{dashboardData.filter(a=>a.status === 'ไม่ผ่าน').length}</p>
+                   </div>
+                 </div>
+     
+                 {/* Recruitment Pipeline Funnel & Charts */}
+                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                   <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col">
+                     <div className="mb-6 flex items-center justify-between">
+                       <div>
+                         <h3 className="font-bold text-lg text-slate-900">แหล่งที่มาแยกตามสาขา (Source)</h3>
+                       </div>
+                       <div className="p-2 bg-blue-50 text-blue-600 rounded-xl"><Building2 size={20} /></div>
+                     </div>
+                     <div className="flex-1 min-h-[300px]">
+                       <ResponsiveContainer width="100%" height="100%">
+                         <BarChart data={branchChartData} margin={{ top: 10, bottom: 0, left: -20, right: 10 }}>
+                           <defs>
+                             <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
+                               <stop offset="5%" stopColor="#3B82F6" stopOpacity={1}/>
+                               <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0.8}/>
+                             </linearGradient>
+                           </defs>
+                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                           <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 11, fill: '#64748B', fontWeight: 600}} dy={10} />
+                           <YAxis axisLine={false} tickLine={false} tick={{fontSize: 11, fill: '#94A3B8', fontWeight: 500}} allowDecimals={false} />
+                           <RechartsTooltip cursor={{ fill: '#F8FAFC' }} contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontWeight: 600 }} />
+                           <Bar dataKey="count" name="จำนวน (คน)" fill="url(#colorCount)" radius={[6,6,0,0]} barSize={40} />
+                         </BarChart>
+                       </ResponsiveContainer>
+                     </div>
+                   </div>
+     
+                   <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col">
+                     <div className="mb-6 flex items-center justify-between">
+                       <div>
+                         <h3 className="font-bold text-lg text-slate-900">อัตราส่วนสถานะผู้สมัคร (Status Mix)</h3>
+                       </div>
+                       <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><PieChart className="w-5 h-5" /></div>
+                     </div>
+                     <div className="flex-1 min-h-[300px]">
+                       <ResponsiveContainer width="100%" height="100%">
+                         <PieChart>
+                           <Pie data={statusChartData} innerRadius={80} outerRadius={115} paddingAngle={3} dataKey="value" stroke="none">
+                             {statusChartData.map((e, i) => <Cell key={i} fill={STATUS_COLORS[e.name] || '#CBD5E1'} />)}
+                           </Pie>
+                           <RechartsTooltip contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                           <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ fontSize: '13px', color: '#475569', fontWeight: 600 }} />
+                         </PieChart>
+                       </ResponsiveContainer>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+            )}
+
+            {/* Modals for Edit/View ... */}
+            {editingApplicant && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+                <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
+                  <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-blue-50 text-blue-900">
+                    <h3 className="font-bold text-lg flex items-center space-x-2"><Edit size={18} /><span>แก้ไขข้อมูลผู้สมัคร</span></h3>
+                    <button onClick={() => setEditingApplicant(null)} className="p-2 text-blue-400 hover:bg-blue-100 hover:text-blue-600 rounded-full"><X size={20} /></button>
+                  </div>
+                  <form onSubmit={submitEditApplicant} className="p-6 space-y-5">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div><label className="block text-sm font-semibold mb-2">ชื่อ-นามสกุล</label><input required type="text" value={editingApplicant.name} onChange={(e) => setEditingApplicant({...editingApplicant, name: e.target.value})} className="w-full border rounded-xl px-4 py-2.5 outline-none focus:border-blue-500" /></div>
+                        <div><label className="block text-sm font-semibold mb-2">เบอร์ติดต่อ</label><input required type="tel" value={editingApplicant.phone} onChange={(e) => setEditingApplicant({...editingApplicant, phone: e.target.value})} className="w-full border rounded-xl px-4 py-2.5 outline-none focus:border-blue-500" /></div>
+                    </div>
+                    <div><label className="block text-sm font-semibold mb-2">ตำแหน่งงาน</label><input required type="text" value={editingApplicant.position} onChange={(e) => setEditingApplicant({...editingApplicant, position: e.target.value})} className="w-full border rounded-xl px-4 py-2.5 outline-none focus:border-blue-500" /></div>
+                    <div>
+                      <label className="block text-sm font-semibold mb-2">สถานะผู้สมัคร</label>
+                      <select required value={editingApplicant.status} onChange={(e) => setEditingApplicant({...editingApplicant, status: e.target.value})} className="w-full border rounded-xl px-4 py-2.5 outline-none focus:border-blue-500">
+                        {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    {['อื่นๆ', 'ไม่ผ่าน', 'ไม่มาเริ่มงาน'].includes(editingApplicant.status) && (
+                      <div><label className="block text-sm font-semibold text-orange-800 mb-2">ระบุเหตุผล <span className="text-red-500">*</span></label><textarea required value={editingApplicant.comment || ''} onChange={(e) => setEditingApplicant({...editingApplicant, comment: e.target.value})} rows="2" className="w-full border border-orange-300 rounded-xl px-4 py-2.5 outline-none focus:border-orange-500"></textarea></div>
+                    )}
+                    <div className="flex justify-end pt-4 space-x-3">
+                      <button type="button" onClick={() => setEditingApplicant(null)} className="px-5 py-2.5 rounded-xl font-semibold text-slate-600 hover:bg-slate-100">ยกเลิก</button>
+                      <button type="submit" className="px-5 py-2.5 rounded-xl font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-sm">บันทึก</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+            
+            {viewApplicants && (
+               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+                 <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden">
+                   <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                     <div>
+                       <h3 className="font-bold text-lg text-slate-900">ผู้สมัคร: {viewApplicants.position}</h3>
+                       <p className="text-sm text-slate-500">{viewApplicants.branchName}</p>
+                     </div>
+                     <button onClick={() => setViewApplicants(null)} className="p-2 text-slate-400 hover:bg-slate-200 rounded-full transition-colors"><X size={20} /></button>
+                   </div>
+                   <div className="p-6 max-h-[60vh] overflow-y-auto">
+                     <div className="space-y-3">
+                       {viewApplicants.list.map(app => (
+                         <div key={app.id} className="p-4 rounded-xl border border-slate-100 flex justify-between items-center hover:border-blue-200 transition-colors">
+                           <div className="flex items-start space-x-3">
+                             <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold">{app.name.charAt(0)}</div>
+                             <div>
+                               <p className="font-bold text-slate-900">{app.name}</p>
+                               <p className="text-sm text-slate-500 flex items-center mt-0.5"><Phone size={12} className="mr-1"/> {app.phone}</p>
+                             </div>
+                           </div>
+                           <div className="text-right">
+                             <span className="inline-block px-2.5 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: `${STATUS_COLORS[app.status]}15`, color: STATUS_COLORS[app.status] }}>{app.status}</span>
+                             <p className="text-[10px] text-slate-400 mt-1">โดย {app.ta}</p>
+                           </div>
+                         </div>
+                       ))}
+                     </div>
+                   </div>
+                 </div>
+               </div>
+             )}
+
+          </main>
+        </div>
+      );
+    }
+
+    const root = createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
