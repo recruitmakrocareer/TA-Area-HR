@@ -33,7 +33,7 @@
     import React, { useState, useMemo, useEffect } from 'https://esm.sh/react@18.2.0';
     import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
     import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'https://esm.sh/recharts@2.12.0?deps=react@18.2.0,react-dom@18.2.0';
-    import { Users, UserPlus, BarChart3, Building2, CheckCircle2, Clock, MapPin, Search, AlertCircle, FileText, Briefcase, Phone, MessageSquare, Map, Target, Edit, Trash2, X, BellRing, Download, Paperclip, Upload } from 'https://esm.sh/lucide-react@0.344.0?deps=react@18.2.0';
+    import { Users, UserPlus, BarChart3, Building2, CheckCircle2, Clock, MapPin, Search, AlertCircle, FileText, Briefcase, Phone, MessageSquare, Map, Target, Edit, Trash2, X, BellRing, Download, Paperclip, Upload, Eye } from 'https://esm.sh/lucide-react@0.344.0?deps=react@18.2.0';
 
     // ==========================================
     // ⚙️ การตั้งค่า GOOGLE SHEETS API
@@ -115,6 +115,9 @@
       const [formData, setFormData] = useState({ name: '', phone: '', position: '', status: '', comment: '', resumeName: '', resumeBase64: '' });
       const [editingApplicant, setEditingApplicant] = useState(null);
       const [applicants, setApplicants] = useState([]);
+
+      // --- STATE: Preview File ---
+      const [previewFile, setPreviewFile] = useState(null);
 
       // --- STATE: Area HR ---
       const [selectedAreas, setSelectedAreas] = useState([]);
@@ -711,8 +714,8 @@
                         <div className="flex items-center space-x-2">
                            <label className="flex items-center justify-center w-full bg-white border border-slate-300 border-dashed rounded-xl px-4 py-3 hover:bg-slate-50 hover:border-blue-400 cursor-pointer transition-colors shadow-sm">
                               <Paperclip size={18} className="text-blue-500 mr-2" />
-                              <span className="text-sm text-slate-600 font-medium">{formData.resumeName || 'คลิกเพื่อเลือกไฟล์ (PDF, DOC, DOCX)'}</span>
-                              <input type="file" className="hidden" accept=".pdf,.doc,.docx" onChange={handleFileUpload} />
+                              <span className="text-sm text-slate-600 font-medium">{formData.resumeName || 'คลิกเพื่อเลือกไฟล์ (PDF, DOC, รูปภาพ)'}</span>
+                              <input type="file" className="hidden" accept=".pdf,.doc,.docx,image/*" onChange={handleFileUpload} />
                            </label>
                            {formData.resumeName && (
                              <button type="button" onClick={() => setFormData(prev => ({...prev, resumeName:'', resumeBase64:''}))} className="p-3 rounded-xl bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
@@ -759,17 +762,25 @@
                               {app.comment && <div className="text-xs text-slate-500 mt-1 max-w-[200px] truncate">เหตุผล: {app.comment}</div>}
                             </td>
                             <td className="px-6 py-4">
-                              {/* ส่วนแก้ไขให้ไฟล์แนบสามารถกดเปิดดูหรือดาวน์โหลดได้ */}
+                              {/* Preview File Button Update */}
                               {app.resumeBase64 ? (
-                                <a 
-                                  href={app.resumeBase64} 
-                                  download={app.resumeName}
-                                  className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1.5 rounded-md border border-blue-200 flex w-fit items-center hover:bg-blue-600 hover:text-white transition-colors shadow-sm cursor-pointer"
-                                  title={`คลิกเพื่อดาวน์โหลด: ${app.resumeName}`}
-                                >
-                                  <Paperclip size={12} className="mr-1.5"/> 
-                                  {app.resumeName.length > 12 ? app.resumeName.substring(0, 12) + '...' : app.resumeName}
-                                </a>
+                                <div className="flex items-center space-x-2">
+                                  <button 
+                                    onClick={() => setPreviewFile({ base64: app.resumeBase64, name: app.resumeName })}
+                                    className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1.5 rounded-md border border-blue-200 flex items-center hover:bg-blue-600 hover:text-white transition-colors shadow-sm cursor-pointer"
+                                    title="ดูตัวอย่าง"
+                                  >
+                                    <Eye size={12} className="mr-1.5"/> Preview
+                                  </button>
+                                  <a 
+                                    href={app.resumeBase64} 
+                                    download={app.resumeName}
+                                    className="text-slate-400 hover:text-blue-600 transition-colors"
+                                    title={`ดาวน์โหลด: ${app.resumeName}`}
+                                  >
+                                    <Download size={16}/>
+                                  </a>
+                                </div>
                               ) : app.resumeName ? (
                                 <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md border flex w-fit items-center"><Paperclip size={12} className="mr-1"/> มีไฟล์</span>
                               ) : (
@@ -1018,6 +1029,58 @@
                  </div>
                </div>
              )}
+
+            {/* Modal: Preview File */}
+            {previewFile && (
+              <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden">
+                  <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                    <div>
+                      <h3 className="font-bold text-lg text-slate-900 flex items-center space-x-2">
+                        <Eye size={20} className="text-blue-500" />
+                        <span>ตัวอย่างไฟล์เอกสาร</span>
+                      </h3>
+                      <p className="text-sm text-slate-500 mt-0.5">{previewFile.name}</p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <a 
+                        href={previewFile.base64} 
+                        download={previewFile.name} 
+                        className="flex items-center space-x-1.5 px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl transition-colors font-semibold shadow-sm text-sm"
+                      >
+                        <Download size={16} /><span>ดาวน์โหลด</span>
+                      </a>
+                      <button onClick={() => setPreviewFile(null)} className="p-2 text-slate-400 hover:bg-slate-200 hover:text-slate-700 rounded-full transition-colors"><X size={20} /></button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex-1 bg-slate-100 p-4 sm:p-6 flex items-center justify-center overflow-hidden">
+                    {previewFile.base64.startsWith('data:application/pdf') || previewFile.base64.startsWith('data:image/') ? (
+                      <iframe 
+                        src={previewFile.base64} 
+                        className="w-full h-full rounded-xl border border-slate-200 shadow-sm bg-white" 
+                        title="File Preview"
+                      ></iframe>
+                    ) : (
+                      <div className="text-center bg-white p-12 rounded-2xl shadow-sm border border-slate-200 max-w-sm">
+                        <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                          <FileText size={40} className="text-orange-400" />
+                        </div>
+                        <p className="text-lg font-bold text-slate-800 mb-2">ไม่สามารถแสดงตัวอย่างไฟล์ได้</p>
+                        <p className="text-sm text-slate-500 mb-6">ไฟล์ประเภท Word (doc, docx) หรือไฟล์อื่นๆ จำเป็นต้องดาวน์โหลดเพื่อเปิดดูในเครื่องของคุณครับ</p>
+                        <a 
+                          href={previewFile.base64} 
+                          download={previewFile.name} 
+                          className="inline-flex items-center justify-center space-x-2 bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors font-semibold shadow-sm w-full"
+                        >
+                          <Download size={18} /><span>ดาวน์โหลดไฟล์</span>
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
           </main>
         </div>
