@@ -38,7 +38,7 @@
     // ==========================================
     // ⚙️ การตั้งค่า GOOGLE SHEETS API
     // ==========================================
-    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwKUyZOjJ59YufdzNsGoah5GjiuD64oaRu3sgQob8NRVE3v485KAHQulXyqzx3ME1kVqQ/exec"; 
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby8kcSKHAIz_K2DsYj7bXaAlr5t_ZZ3DigZ99x8C1BicfbZkY4CQuYE8kOf5HyiwOdTcw/exec"; 
 
     // --- MOCK DATA ---
     const DEFAULT_TAS = ['TA 1 (คุณเอ)', 'TA 2 (คุณบี)', 'TA 3 (คุณซี)', 'TA 4 (คุณดี)'];
@@ -102,6 +102,7 @@
 
     function App() {
       const [activeTab, setActiveTab] = useState('area_hr');
+      const [isLoading, setIsLoading] = useState(true); // เพิ่ม State สำหรับโหลดข้อมูลจาก Cloud
       
       // --- STATE: ข้อมูลตั้งต้น ---
       const [appBranches, setAppBranches] = useState([]);
@@ -113,7 +114,7 @@
       const [selectedTA, setSelectedTA] = useState('');
       const [recruitAreaFilter, setRecruitAreaFilter] = useState('');
       const [recruitBranchFilter, setRecruitBranchFilter] = useState('');
-      const [addingApplicantFor, setAddingApplicantFor] = useState(null); // Modal สำหรับเพิ่มผู้สมัคร
+      const [addingApplicantFor, setAddingApplicantFor] = useState(null);
       const [formData, setFormData] = useState({ name: '', phone: '', status: '', comment: '', resumeName: '', resumeBase64: '' });
       const [editingApplicant, setEditingApplicant] = useState(null);
       const [applicants, setApplicants] = useState([]);
@@ -130,37 +131,42 @@
 
       const [dashboardTA, setDashboardTA] = useState('ALL');
 
-      // --- EFFECTS: Load Data ---
+      // --- EFFECTS: Load Data from Google Sheets ---
       useEffect(() => {
-        // โหลดข้อมูลสาขา
-        const localBranches = localStorage.getItem('hr_branches');
-        let initialBranches = DEFAULT_BRANCHES;
-        if (localBranches) {
-          try { initialBranches = JSON.parse(localBranches); } catch(e) {}
-        }
-        setAppBranches(initialBranches);
+        const initLoad = async () => {
+          setIsLoading(true);
+          try {
+            if (GOOGLE_SCRIPT_URL) {
+              const res = await fetch(GOOGLE_SCRIPT_URL);
+              const data = await res.json();
+              if (data.applicants) setApplicants(data.applicants);
+              if (data.vacancies) setVacancies(data.vacancies);
+            }
+          } catch (e) {
+            console.error("ดึงข้อมูลจาก Cloud ไม่สำเร็จ, ใช้ข้อมูลสำรองในเครื่อง", e);
+            const localApps = localStorage.getItem('hr_applicants');
+            const localVacs = localStorage.getItem('hr_vacancies');
+            if(localApps) setApplicants(JSON.parse(localApps));
+            if(localVacs) setVacancies(JSON.parse(localVacs));
+          }
+          
+          // โหลดการตั้งค่าสาขา TA และ ตำแหน่ง จากในเครื่องของผู้ใช้ (เพราะไฟล์ CSV อัปโหลดไว้ที่เครื่องใครเครื่องมัน)
+          const localBranches = localStorage.getItem('hr_branches');
+          if (localBranches) { try { setAppBranches(JSON.parse(localBranches)); } catch(e) {} }
+          else { setAppBranches(DEFAULT_BRANCHES); }
 
-        // โหลดข้อมูล TA
-        const localTAs = localStorage.getItem('hr_tas');
-        let initialTAs = DEFAULT_TAS;
-        if (localTAs) {
-          try { initialTAs = JSON.parse(localTAs); } catch(e) {}
-        }
-        setAppTAs(initialTAs);
+          const localTAs = localStorage.getItem('hr_tas');
+          if (localTAs) { try { setAppTAs(JSON.parse(localTAs)); } catch(e) {} }
+          else { setAppTAs(DEFAULT_TAS); }
 
-        // โหลดข้อมูลตำแหน่งงาน
-        const localPositions = localStorage.getItem('hr_positions');
-        let initialPositions = DEFAULT_POSITIONS;
-        if (localPositions) {
-          try { initialPositions = JSON.parse(localPositions); } catch(e) {}
-        }
-        setAppPositions(initialPositions);
+          const localPositions = localStorage.getItem('hr_positions');
+          if (localPositions) { try { setAppPositions(JSON.parse(localPositions)); } catch(e) {} }
+          else { setAppPositions(DEFAULT_POSITIONS); }
 
-        // โหลดข้อมูลประวัติอื่นๆ
-        const localApps = localStorage.getItem('hr_applicants');
-        const localVacs = localStorage.getItem('hr_vacancies');
-        if(localApps) setApplicants(JSON.parse(localApps));
-        if(localVacs) setVacancies(JSON.parse(localVacs));
+          setIsLoading(false);
+        };
+        
+        initLoad();
       }, []);
 
       // สร้างรายชื่อ Area ให้เรียงตามตัวเลข
@@ -175,10 +181,26 @@
         }
       }, [appBranches]);
 
-      useEffect(() => {
-        localStorage.setItem('hr_applicants', JSON.stringify(applicants));
-        localStorage.setItem('hr_vacancies', JSON.stringify(vacancies));
-      }, [applicants, vacancies]);
+      // --- ฟังก์ชัน Sync ขึ้น Google Sheets (ทุกครั้งที่มีการกดเซฟ แก้ไข หรือลบ) ---
+      const syncToCloud = async (newApps, newVacs) => {
+        // แบคอัปไว้ในเครื่องกันพลาด
+        localStorage.setItem('hr_applicants', JSON.stringify(newApps));
+        localStorage.setItem('hr_vacancies', JSON.stringify(newVacs));
+        
+        if (GOOGLE_SCRIPT_URL) {
+          try {
+            await fetch(GOOGLE_SCRIPT_URL, {
+              method: 'POST',
+              mode: 'no-cors',
+              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify({ action: 'saveAll', applicants: newApps, vacancies: newVacs })
+            });
+          } catch (error) {
+            console.error('Sync Error:', error);
+          }
+        }
+      };
+
 
       // --- IMPORT CSV FUNCTIONS ---
       const handleImportCSV = (e) => {
@@ -315,7 +337,7 @@
         if (!selectedTA || !addingApplicantFor) return;
         
         const newRecord = { 
-          id: Date.now(), 
+          id: Date.now().toString(), 
           ta: selectedTA, 
           branchCode: addingApplicantFor.branchCode, 
           branchName: addingApplicantFor.branchName, 
@@ -324,32 +346,28 @@
           timestamp: new Date().toLocaleString('th-TH') 
         };
         
-        setApplicants([newRecord, ...applicants]);
+        const newApps = [newRecord, ...applicants];
+        setApplicants(newApps);
         setFormData({ name: '', phone: '', status: '', comment: '', resumeName: '', resumeBase64: '' });
-        setAddingApplicantFor(null); // ปิด Modal
+        setAddingApplicantFor(null);
         
-        if (GOOGLE_SCRIPT_URL) {
-          try {
-            await fetch(GOOGLE_SCRIPT_URL, {
-              method: 'POST',
-              mode: 'no-cors',
-              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-              body: JSON.stringify(newRecord)
-            });
-          } catch (error) {
-            console.error('เกิดข้อผิดพลาดในการส่งข้อมูลไปที่ Google Sheets:', error);
-          }
-        }
+        syncToCloud(newApps, vacancies);
       };
 
       const deleteApplicant = (id) => {
-        if (window.confirm('คุณแน่ใจหรือไม่ที่จะลบข้อมูลผู้สมัครรายนี้?')) setApplicants(applicants.filter(a => a.id !== id));
+        if (window.confirm('คุณแน่ใจหรือไม่ที่จะลบข้อมูลผู้สมัครรายนี้?')) {
+          const newApps = applicants.filter(a => a.id !== id);
+          setApplicants(newApps);
+          syncToCloud(newApps, vacancies);
+        }
       };
 
       const submitEditApplicant = (e) => {
         e.preventDefault();
-        setApplicants(applicants.map(a => a.id === editingApplicant.id ? editingApplicant : a));
+        const newApps = applicants.map(a => a.id === editingApplicant.id ? editingApplicant : a);
+        setApplicants(newApps);
         setEditingApplicant(null);
+        syncToCloud(newApps, vacancies);
       };
 
       // --- HANDLERS: Area HR ---
@@ -367,13 +385,29 @@
         const isDuplicate = vacancies.some(v => v.branchCode === branch.code && v.position === vacancyForm.position && v.manualStatus !== 'Closed');
         if (isDuplicate) { alert(`มีตำแหน่ง "${vacancyForm.position}" เปิดรับในสาขานี้อยู่แล้ว!`); return; }
 
-        const newVacancy = { id: Date.now(), area: branch.area, branchCode: branch.code, branchName: branch.name, position: vacancyForm.position, manualStatus: vacancyForm.manualStatus, createdAt: Date.now(), timestamp: new Date().toLocaleString('th-TH') };
-        setVacancies([newVacancy, ...vacancies]);
+        const newVacancy = { 
+          id: Date.now().toString(), 
+          area: branch.area, 
+          branchCode: branch.code, 
+          branchName: branch.name, 
+          position: vacancyForm.position, 
+          manualStatus: vacancyForm.manualStatus, 
+          createdAt: Date.now(), 
+          timestamp: new Date().toLocaleString('th-TH') 
+        };
+        
+        const newVacs = [newVacancy, ...vacancies];
+        setVacancies(newVacs);
         setVacancyForm({ branchCode: '', position: '', manualStatus: 'Vacant' });
+        syncToCloud(applicants, newVacs);
       };
 
       const deleteVacancy = (id) => {
-        if (window.confirm('คุณแน่ใจหรือไม่ที่จะลบตำแหน่งงานนี้?')) setVacancies(vacancies.filter(v => v.id !== id));
+        if (window.confirm('คุณแน่ใจหรือไม่ที่จะลบตำแหน่งงานนี้?')) {
+          const newVacs = vacancies.filter(v => v.id !== id);
+          setVacancies(newVacs);
+          syncToCloud(applicants, newVacs);
+        }
       };
 
       const submitEditVacancy = (e) => {
@@ -382,11 +416,17 @@
         if (isDuplicate) { alert(`มีตำแหน่ง "${editingVacancy.position}" เปิดรับในสาขานี้อยู่แล้ว!`); return; }
         
         const branch = appBranches.find(b => b.code === editingVacancy.branchCode);
-        setVacancies(vacancies.map(v => v.id === editingVacancy.id ? { ...editingVacancy, area: branch.area, branchName: branch.name } : v));
+        const newVacs = vacancies.map(v => v.id === editingVacancy.id ? { ...editingVacancy, area: branch.area, branchName: branch.name } : v);
+        setVacancies(newVacs);
         setEditingVacancy(null);
+        syncToCloud(applicants, newVacs);
       };
 
-      const closeVacancy = (id) => setVacancies(vacancies.map(v => v.id === id ? { ...v, manualStatus: 'Closed' } : v));
+      const closeVacancy = (id) => {
+        const newVacs = vacancies.map(v => v.id === id ? { ...v, manualStatus: 'Closed' } : v);
+        setVacancies(newVacs);
+        syncToCloud(applicants, newVacs);
+      };
 
       // --- DERIVED DATA ---
       const availableBranchesForAreas = appBranches.filter(b => selectedAreas.includes(b.area));
@@ -454,8 +494,18 @@
 
       // --- COMPONENTS ---
       return (
-        <div className="min-h-screen font-sans text-slate-800 pb-10">
+        <div className="min-h-screen font-sans text-slate-800 pb-10 relative">
           
+          {/* Loading Overlay ตอนดึงข้อมูลครั้งแรก */}
+          {isLoading && (
+            <div className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center">
+              <div className="bg-white px-8 py-6 rounded-2xl shadow-xl flex flex-col items-center space-y-4">
+                <div className="animate-spin w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+                <span className="font-bold text-slate-700">กำลังเชื่อมต่อข้อมูลกับ Google Sheets...</span>
+              </div>
+            </div>
+          )}
+
           {/* Navbar */}
           <nav className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
