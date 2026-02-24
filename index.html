@@ -54,7 +54,15 @@
 
     // --- MOCK DATA ---
     const DEFAULT_TAS = ['TA 1 (คุณเอ)', 'TA 2 (คุณบี)', 'TA 3 (คุณซี)', 'TA 4 (คุณดี)'];
-    const DEFAULT_POSITIONS = ['ผู้จัดการสาขา', 'ผู้ช่วยผู้จัดการสาขา', 'พนักงานขาย', 'พนักงานแคชเชียร์', 'พนักงานจัดเรียงสินค้า', 'พนักงานธุรการ', 'บัญชี'];
+    const DEFAULT_POSITIONS = [
+      { position: 'ผู้จัดการสาขา', recruit: '' },
+      { position: 'ผู้ช่วยผู้จัดการสาขา', recruit: '' },
+      { position: 'พนักงานขาย', recruit: '' },
+      { position: 'พนักงานแคชเชียร์', recruit: '' },
+      { position: 'พนักงานจัดเรียงสินค้า', recruit: '' },
+      { position: 'พนักงานธุรการ', recruit: '' },
+      { position: 'บัญชี', recruit: '' }
+    ];
 
     // ดึงข้อมูลสาขาจาก CSV ที่ระบบอ่านได้เบื้องต้น
     const DEFAULT_BRANCHES = [
@@ -154,6 +162,13 @@
 
       // --- EFFECTS: Load Data from Google Sheets ---
       useEffect(() => {
+        const normalizePositions = (positions) => {
+          return positions.map(p => {
+            if (typeof p === 'string') return { position: p, recruit: '' };
+            return { position: String(p.position || p.name || ''), recruit: String(p.recruit || '') };
+          });
+        };
+
         const initLoad = async () => {
           setIsLoading(true);
           try {
@@ -178,7 +193,7 @@
               if (data.tas && data.tas.length > 0) setAppTAs(data.tas.map(t => String(t.name || t)));
               else setAppTAs(DEFAULT_TAS);
               
-              if (data.positions && data.positions.length > 0) setAppPositions(data.positions.map(p => String(p.name || p)));
+              if (data.positions && data.positions.length > 0) setAppPositions(normalizePositions(data.positions));
               else setAppPositions(DEFAULT_POSITIONS);
 
             }
@@ -193,8 +208,18 @@
             if (localBranches) { try { setAppBranches(JSON.parse(localBranches)); } catch(err) {} }
             else setAppBranches(DEFAULT_BRANCHES);
             
-            setAppTAs(DEFAULT_TAS);
-            setAppPositions(DEFAULT_POSITIONS);
+            const localTAs = localStorage.getItem('hr_tas');
+            if (localTAs) { try { setAppTAs(JSON.parse(localTAs)); } catch(e) {} }
+            else setAppTAs(DEFAULT_TAS);
+
+            const localPositions = localStorage.getItem('hr_positions');
+            if (localPositions) { 
+              try { 
+                const parsed = JSON.parse(localPositions); 
+                setAppPositions(normalizePositions(parsed)); 
+              } catch(e) {} 
+            }
+            else setAppPositions(DEFAULT_POSITIONS);
           }
           
           setIsLoading(false);
@@ -247,7 +272,7 @@
                 action: 'updateMaster', 
                 branches: newBranches, 
                 tas: newTAs.map(name => ({name})), 
-                positions: newPositions.map(name => ({name})) 
+                positions: newPositions // ส่งชุดข้อมูลตำแหน่งและ TA ผู้รับผิดชอบ
               })
             });
             alert('อัปเดตข้อมูล Master Data ขึ้นระบบส่วนกลางสำเร็จ!');
@@ -348,7 +373,8 @@
               const row = data[i];
               if (row && row[0]) {
                 const posName = String(row[0]).trim();
-                if (posName) newPositions.push(posName);
+                const recruitName = row[1] ? String(row[1]).trim() : '';
+                if (posName) newPositions.push({ position: posName, recruit: recruitName });
               }
             }
 
@@ -356,6 +382,7 @@
               setAppPositions(newPositions);
               localStorage.setItem('hr_positions', JSON.stringify(newPositions));
               syncMasterToCloud(appBranches, appTAs, newPositions);
+              alert(`อัปเดตตำแหน่งงานและผู้รับผิดชอบสำเร็จ! นำเข้าทั้งหมด ${newPositions.length} รายการ`);
             } else {
               alert('ไม่พบข้อมูลในไฟล์ (ข้อมูลตำแหน่งงานต้องอยู่ในคอลัมน์แรกสุด)');
             }
@@ -554,9 +581,21 @@
           if (v.manualStatus === 'Closed') return false;
           if (recruitAreaFilter && String(v.area) !== String(recruitAreaFilter)) return false;
           if (recruitBranchFilter && String(v.branchCode) !== String(recruitBranchFilter)) return false;
+
+          // กรองตาม TA (Recruit) ที่ผูกไว้กับตำแหน่ง
+          if (selectedTA) {
+            const posInfo = appPositions.find(p => String(p.position) === String(v.position));
+            if (posInfo && posInfo.recruit && String(posInfo.recruit).trim() !== '') {
+              // ถ้ามีข้อมูลผู้รับผิดชอบผูกไว้ใน CSV และไม่ตรงกับ TA ที่เลือกอยู่ ให้ซ่อนตำแหน่งงานนี้ทิ้งไป
+              if (String(posInfo.recruit).trim().toLowerCase() !== String(selectedTA).trim().toLowerCase()) {
+                return false;
+              }
+            }
+          }
+
           return true;
         });
-      }, [vacancies, recruitAreaFilter, recruitBranchFilter]);
+      }, [vacancies, recruitAreaFilter, recruitBranchFilter, appPositions, selectedTA]);
 
       const branchesForRecruitFilter = appBranches.filter(b => !recruitAreaFilter || String(b.area) === String(recruitAreaFilter));
       
@@ -706,7 +745,7 @@
                           <label className="block text-sm font-semibold text-slate-700 mb-2">2. ตำแหน่งงาน <span className="text-red-500">*</span></label>
                           <select required name="position" value={vacancyForm.position} onChange={handleVacancyInputChange} className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none">
                             <option value="">-- เลือกตำแหน่งงาน --</option>
-                            {appPositions.map(pos => <option key={pos} value={pos}>{pos}</option>)}
+                            {appPositions.map(pos => <option key={pos.position} value={pos.position}>{pos.position}</option>)}
                           </select>
                         </div>
                         <div>
@@ -772,14 +811,7 @@
                                     </td>
                                     <td className="px-3 py-3">
                                       <select value={editVacForm.position} onChange={(e) => setEditVacForm({...editVacForm, position: e.target.value})} className="w-full text-xs font-semibold border-slate-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm">
-                                        {appPositions.map(pos => <option key={pos} value={pos}>{pos}</option>)}
-                       </select>
-                                    </td>
-                                    <td className="px-3 py-3 text-center text-slate-400 text-xs">- ออโต้ -</td>
-                                    <td className="px-3 py-3 text-center text-slate-400 text-xs">- ออโต้ -</td>
-                                    <td className="px-3 py-3">
-                                      <select value={editVacForm.manualStatus} onChange={(e) => setEditVacForm({...editVacForm, manualStatus: e.target.value})} className="w-full text-xs font-semibold border-slate-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm">
-                                        {VACANCY_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                                        {appPositions.map(pos => <option key={pos.position} value={pos.position}>{pos.position}</option>)}
                                       </select>
                                     </td>
                                     <td className="px-3 py-3 text-right whitespace-nowrap">
@@ -896,12 +928,12 @@
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                       <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/50">
                         <div>
-                          <h3 className="font-bold text-slate-900 text-lg flex items-center space-x-2">
-                            <Target className="text-blue-600" size={20} />
-                            <span>ตำแหน่งงานที่กำลังเปิดรับ (Active Vacancies)</span>
-                          </h3>
-                          <p className="text-sm text-slate-500 mt-1 ml-7">เลือก "เพิ่มผู้สมัคร" ในตำแหน่งงานที่ต้องการ</p>
-                        </div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">ตำแหน่งงาน</label>
+                      <select required value={editingVacancy.position} onChange={(e) => setEditingVacancy({...editingVacancy, position: e.target.value})} className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 focus:ring-blue-500/10 focus:border-blue-500 outline-none">
+                        <option value="">-- เลือกตำแหน่งงาน --</option>
+                        {appPositions.map(pos => <option key={pos.position} value={pos.position}>{pos.position}</option>)}
+                      </select>
+                    </div>
                         
                         {/* Filters for Recruit Table */}
                         <div className="flex items-center space-x-3 w-full md:w-auto">
@@ -1334,8 +1366,8 @@
                       <div className="flex items-center space-x-3">
                         <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg group-hover:bg-indigo-100 transition-colors"><Briefcase size={20} /></div>
                         <div className="text-left">
-                          <span className="block text-sm font-bold text-slate-700">อัปเดตไฟล์ตำแหน่งงาน</span>
-                          <span className="block text-xs text-slate-500">รายชื่อตำแหน่งในคอลัมน์ A</span>
+                          <span className="block text-sm font-bold text-slate-700">อัปเดตไฟล์ตำแหน่ง-Recruit</span>
+                          <span className="block text-xs text-slate-500">รูปแบบ: ชื่อตำแหน่ง, ผู้รับผิดชอบ (TA)</span>
                         </div>
                       </div>
                       <Upload size={18} className="text-slate-400 group-hover:text-indigo-500 transition-colors" />
