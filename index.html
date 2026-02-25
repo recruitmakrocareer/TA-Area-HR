@@ -644,11 +644,11 @@
       const availableBranchesForAreas = appBranches.filter(b => selectedAreas.includes(b.area));
       const filteredVacancies = vacancies.filter(v => selectedAreas.length === 0 || selectedAreas.includes(v.area));
 
-      const getVacancyInsights = (branchCode, position, manualStatus, createdAt) => {
-        const matchedApplicants = applicants.filter(app => String(app.branchCode) === String(branchCode) && String(app.position) === String(position));
+      const getVacancyInsights = (v) => {
+        const matchedApplicants = applicants.filter(app => String(app.branchCode) === String(v.branchCode) && String(app.position) === String(v.position));
         const applicantCount = matchedApplicants.length;
-        let computedStatus = manualStatus;
-        if (manualStatus !== 'Closed') {
+        let computedStatus = v.manualStatus;
+        if (v.manualStatus !== 'Closed') {
           if (matchedApplicants.some(app => app.status === 'มาเริ่มงาน')) computedStatus = 'Hiring';
           else if (matchedApplicants.some(app => app.status === 'รอเริ่มงาน')) computedStatus = 'รอเริ่มงาน';
           else if (matchedApplicants.some(app => app.status === 'ตรวจสุขภาพ')) computedStatus = 'รอตรวจสุขภาพ';
@@ -659,10 +659,28 @@
         const hiredApps = matchedApplicants.filter(app => ['รอเริ่มงาน', 'มาเริ่มงาน'].includes(app.status));
         if (hiredApps.length > 0) {
           // หาเวลาที่เร็วที่สุดที่ผู้สมัครถูกปรับสถานะเป็นรอเริ่มงาน
-          slaEndTime = Math.min(...hiredApps.map(a => a.updatedAt || parseInt(a.id) || Date.now()));
+          slaEndTime = Math.min(...hiredApps.map(a => {
+            const uTime = a.updatedAt ? Number(String(a.updatedAt).replace(/,/g, '')) : Date.now();
+            return isNaN(uTime) ? Date.now() : uTime;
+          }));
         }
 
-        const slaDays = Math.max(0, Math.floor((slaEndTime - createdAt) / (1000 * 60 * 60 * 24)));
+        // แก้ปัญหา Google Sheets แปลงตัวเลขเป็น Format ที่มีลูกน้ำ (1,740,xxx,xxx)
+        let startMs = Date.now();
+        if (v.createdAt) {
+          const cleanStr = String(v.createdAt).replace(/,/g, '');
+          const num = Number(cleanStr);
+          if (!isNaN(num) && num > 1000000000000) startMs = num;
+        }
+        
+        // ถ้ายอมแพ้จาก createdAt ให้ลองดึงเวลาจาก ID (เพราะเราสร้าง ID ด้วย Date.now())
+        if (startMs === Date.now() && v.id) {
+          const cleanId = String(v.id).replace(/,/g, '');
+          const numId = Number(cleanId);
+          if (!isNaN(numId) && numId > 1000000000000) startMs = numId;
+        }
+
+        const slaDays = Math.max(0, Math.floor((slaEndTime - startMs) / (1000 * 60 * 60 * 24)));
         return { applicantCount, computedStatus, slaDays, matchedApplicants };
       };
 
@@ -729,7 +747,7 @@
         ];
         vacancies.forEach(v => {
           if (v.manualStatus !== 'Closed') {
-            const { slaDays } = getVacancyInsights(v.branchCode, v.position, v.manualStatus, v.createdAt);
+            const { slaDays } = getVacancyInsights(v);
             if (slaDays <= 14) buckets[0].count++;
             else if (slaDays <= 30) buckets[1].count++;
             else if (slaDays <= 45) buckets[2].count++;
@@ -944,7 +962,7 @@
                               }
 
                               // โหมดแสดงผลปกติ
-                              const { applicantCount, computedStatus, slaDays, matchedApplicants } = getVacancyInsights(v.branchCode, v.position, v.manualStatus, v.createdAt);
+                              const { applicantCount, computedStatus, slaDays, matchedApplicants } = getVacancyInsights(v);
                               const isHiringAlert = computedStatus === 'Hiring' || computedStatus === 'รอเริ่มงาน';
 
                               return (
@@ -1085,7 +1103,7 @@
                               <tr><td colSpan="5" className="px-6 py-12 text-center text-slate-400">ไม่มีตำแหน่งงานว่างที่ตรงกับคุณ หรือยังไม่มีการเปิดรับตำแหน่งจาก Area HR</td></tr>
                             ) : (
                               activeVacanciesForRecruit.map(v => {
-                                const { applicantCount, computedStatus } = getVacancyInsights(v.branchCode, v.position, v.manualStatus, v.createdAt);
+                                const { applicantCount, computedStatus } = getVacancyInsights(v);
                                 return (
                                   <tr key={v.id} className="hover:bg-blue-50/30 transition-colors group">
                                     <td className="px-6 py-4">
