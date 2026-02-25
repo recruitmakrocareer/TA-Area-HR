@@ -97,38 +97,58 @@
     const STATUS_COLORS = { 'รอสัมภาษณ์': '#F59E0B', 'ไม่เข้าสัมภาษณ์': '#64748B', 'ผ่าน': '#10B981', 'ไม่ผ่าน': '#EF4444', 'สำรอง': '#3B82F6', 'ตรวจสุขภาพ': '#8B5CF6', 'รอเริ่มงาน': '#0EA5E9', 'มาเริ่มงาน': '#059669', 'ไม่มาเริ่มงาน': '#94A3B8', 'อื่นๆ': '#F97316' };
     const VACANCY_COLORS = { 'Vacant': '#F59E0B', 'Promote&Transfer': '#8B5CF6', 'Hold': '#64748B', 'Closed': '#94A3B8', 'รอตรวจสุขภาพ': '#0EA5E9', 'รอเริ่มงาน': '#0EA5E9', 'Hiring': '#10B981' };
 
-    // --- HELPER FUNCTION: ดึงเวลา Date ออกมาอย่างแม่นยำ ไม่ว่า Google Sheets จะแปลงมาเป็นอะไร ---
+    // --- HELPER FUNCTION: ตัวแปลงวันที่ขั้นเทพ รองรับข้อมูลจาก Google Sheets ทุกรูปแบบ ---
     const parseDateToMs = (val) => {
       if (!val) return null;
       
-      // 1. ลองลบลูกน้ำ (กรณีเป็น Timestamp แล้ว Google แอบใส่ comma)
+      // 1. ลองลบลูกน้ำออก (กรณีตัวเลขถูก Format ใส่ comma มา)
       let cleanStr = String(val).replace(/,/g, '').trim();
       let num = Number(cleanStr);
       
-      // ถ้าแปลงเป็นตัวเลขได้ และค่ามากกว่าปี 2001 (1000000000000 ms) ถือว่าเป็น Timestamp
+      // 1.1 ถ้าเป็นเลข Timestamp ชัดเจน (มิลลิวินาที)
       if (!isNaN(num) && num > 1000000000000) {
         return num;
       }
+      
+      // 1.2 ถ้าเป็นเลข Serial Date ของ Excel/Google Sheets (เช่น 45xxx คือปีประมาณ 2024-2026)
+      if (!isNaN(num) && num > 30000 && num < 100000) {
+        return new Date(Math.round((num - 25569) * 86400 * 1000)).getTime();
+      }
 
-      // 2. ถ้าเป็น String วันที่ปกติ (เช่น 2026-02-24, 02/24/2026)
+      // 2. ถ้าเป็น String วันที่มาตรฐาน ISO หรือ format ภาษาอังกฤษ (เช่น 2026-02-24, Feb 24 2026)
       let d = new Date(val);
       if (!isNaN(d.getTime())) return d.getTime();
 
-      // 3. ถ้าเป็นวันที่เขียนแบบไทย/อังกฤษ DD/MM/YYYY (เช่น 24/2/2026)
-      if (typeof val === 'string' && val.includes('/')) {
-        let parts = val.split(' ')[0].split('/');
+      // 3. ถ้าเป็นวันที่เขียนแบบไทย หรือมีเครื่องหมาย / หรือ - (เช่น 24/2/2026, 24-02-2569)
+      if (typeof val === 'string' && (val.includes('/') || val.includes('-'))) {
+        let datePart = val.split(' ')[0]; // เอาเฉพาะส่วนวันที่ ตัดเวลาทิ้ง
+        let parts = datePart.includes('/') ? datePart.split('/') : datePart.split('-');
+        
         if (parts.length === 3) {
-          let day = parseInt(parts[0], 10);
-          let month = parseInt(parts[1], 10) - 1;
-          let year = parseInt(parts[2], 10);
-          if (year < 2500 && year >= 2000) { 
+          let p1 = parseInt(parts[0], 10);
+          let p2 = parseInt(parts[1], 10);
+          let p3 = parseInt(parts[2], 10);
+
+          let day = p1, month = p2 - 1, year = p3;
+          
+          // เช็คถ้าเขียนสลับตำแหน่งแบบปีขึ้นก่อน (YYYY/MM/DD)
+          if (p1 > 1000) {
+             year = p1;
+             month = p2 - 1;
+             day = p3;
+          }
+
+          // แปลง พ.ศ. เป็น ค.ศ. (ถ้าปีเกิน 2500)
+          if (year > 2500) year -= 543; 
+          
+          if (year >= 2000) { 
              let d2 = new Date(year, month, day);
              if (!isNaN(d2.getTime())) return d2.getTime();
           }
         }
       }
 
-      return null;
+      return null; // แปลงไม่ได้จริงๆ ส่งค่าว่างกลับไป
     };
 
 
@@ -693,14 +713,14 @@
         let slaEndTime = Date.now();
         const hiredApps = matchedApplicants.filter(app => ['รอเริ่มงาน', 'มาเริ่มงาน'].includes(app.status));
         if (hiredApps.length > 0) {
-          // หาเวลาที่เร็วที่สุดที่ผู้สมัครถูกปรับสถานะเป็นรอเริ่มงาน โดยผ่านฟังก์ชันแปลงอัจฉริยะ
-          slaEndTime = Math.min(...hiredApps.map(a => parseDateToMs(a.updatedAt) || parseDateToMs(a.id) || Date.now()));
+          // หาเวลาที่เร็วที่สุดที่ผู้สมัครถูกปรับสถานะเป็นรอเริ่มงาน ผ่านระบบแปลงวันที่ 4 ชั้น
+          slaEndTime = Math.min(...hiredApps.map(a => parseDateToMs(a.updatedAt) || parseDateToMs(a.timestamp) || parseDateToMs(a.id) || Date.now()));
         }
 
-        // หาเวลาตั้งต้นผ่านฟังก์ชันแปลงอัจฉริยะ
-        let startMs = parseDateToMs(v.createdAt) || parseDateToMs(v.id) || Date.now();
+        // หาเวลาเริ่มงาน ผ่านระบบแปลงวันที่ 4 ชั้นสุดแกร่ง
+        let startMs = parseDateToMs(v.createdAt) || parseDateToMs(v.timestamp) || parseDateToMs(v.id) || Date.now();
 
-        const slaDays = Math.max(0, Math.floor((slaEndTime - startMs) / (1000 * 60 * 60 * 24)));
+        const slaDays = Math.max(0, Math.floor((slaEndTime - startMs) / (1000 * 60 * 60 * 24))) || 0;
         return { applicantCount, computedStatus, slaDays, matchedApplicants };
       };
 
@@ -775,7 +795,7 @@
           }
         });
         return buckets;
-      }, [vacancies, applicants]); // โยง applicants เพื่อให้กราฟอัปเดตเมื่อ SLA ของผู้สมัครหยุดลง
+      }, [vacancies, applicants]); 
 
 
       // --- COMPONENTS ---
