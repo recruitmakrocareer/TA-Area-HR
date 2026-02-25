@@ -97,6 +97,41 @@
     const STATUS_COLORS = { 'รอสัมภาษณ์': '#F59E0B', 'ไม่เข้าสัมภาษณ์': '#64748B', 'ผ่าน': '#10B981', 'ไม่ผ่าน': '#EF4444', 'สำรอง': '#3B82F6', 'ตรวจสุขภาพ': '#8B5CF6', 'รอเริ่มงาน': '#0EA5E9', 'มาเริ่มงาน': '#059669', 'ไม่มาเริ่มงาน': '#94A3B8', 'อื่นๆ': '#F97316' };
     const VACANCY_COLORS = { 'Vacant': '#F59E0B', 'Promote&Transfer': '#8B5CF6', 'Hold': '#64748B', 'Closed': '#94A3B8', 'รอตรวจสุขภาพ': '#0EA5E9', 'รอเริ่มงาน': '#0EA5E9', 'Hiring': '#10B981' };
 
+    // --- HELPER FUNCTION: ดึงเวลา Date ออกมาอย่างแม่นยำ ไม่ว่า Google Sheets จะแปลงมาเป็นอะไร ---
+    const parseDateToMs = (val) => {
+      if (!val) return null;
+      
+      // 1. ลองลบลูกน้ำ (กรณีเป็น Timestamp แล้ว Google แอบใส่ comma)
+      let cleanStr = String(val).replace(/,/g, '').trim();
+      let num = Number(cleanStr);
+      
+      // ถ้าแปลงเป็นตัวเลขได้ และค่ามากกว่าปี 2001 (1000000000000 ms) ถือว่าเป็น Timestamp
+      if (!isNaN(num) && num > 1000000000000) {
+        return num;
+      }
+
+      // 2. ถ้าเป็น String วันที่ปกติ (เช่น 2026-02-24, 02/24/2026)
+      let d = new Date(val);
+      if (!isNaN(d.getTime())) return d.getTime();
+
+      // 3. ถ้าเป็นวันที่เขียนแบบไทย/อังกฤษ DD/MM/YYYY (เช่น 24/2/2026)
+      if (typeof val === 'string' && val.includes('/')) {
+        let parts = val.split(' ')[0].split('/');
+        if (parts.length === 3) {
+          let day = parseInt(parts[0], 10);
+          let month = parseInt(parts[1], 10) - 1;
+          let year = parseInt(parts[2], 10);
+          if (year < 2500 && year >= 2000) { 
+             let d2 = new Date(year, month, day);
+             if (!isNaN(d2.getTime())) return d2.getTime();
+          }
+        }
+      }
+
+      return null;
+    };
+
+
     function App() {
       const [activeTab, setActiveTab] = useState('area_hr');
       const [isLoading, setIsLoading] = useState(true); 
@@ -658,27 +693,12 @@
         let slaEndTime = Date.now();
         const hiredApps = matchedApplicants.filter(app => ['รอเริ่มงาน', 'มาเริ่มงาน'].includes(app.status));
         if (hiredApps.length > 0) {
-          // หาเวลาที่เร็วที่สุดที่ผู้สมัครถูกปรับสถานะเป็นรอเริ่มงาน
-          slaEndTime = Math.min(...hiredApps.map(a => {
-            const uTime = a.updatedAt ? Number(String(a.updatedAt).replace(/,/g, '')) : Date.now();
-            return isNaN(uTime) ? Date.now() : uTime;
-          }));
+          // หาเวลาที่เร็วที่สุดที่ผู้สมัครถูกปรับสถานะเป็นรอเริ่มงาน โดยผ่านฟังก์ชันแปลงอัจฉริยะ
+          slaEndTime = Math.min(...hiredApps.map(a => parseDateToMs(a.updatedAt) || parseDateToMs(a.id) || Date.now()));
         }
 
-        // แก้ปัญหา Google Sheets แปลงตัวเลขเป็น Format ที่มีลูกน้ำ (1,740,xxx,xxx)
-        let startMs = Date.now();
-        if (v.createdAt) {
-          const cleanStr = String(v.createdAt).replace(/,/g, '');
-          const num = Number(cleanStr);
-          if (!isNaN(num) && num > 1000000000000) startMs = num;
-        }
-        
-        // ถ้ายอมแพ้จาก createdAt ให้ลองดึงเวลาจาก ID (เพราะเราสร้าง ID ด้วย Date.now())
-        if (startMs === Date.now() && v.id) {
-          const cleanId = String(v.id).replace(/,/g, '');
-          const numId = Number(cleanId);
-          if (!isNaN(numId) && numId > 1000000000000) startMs = numId;
-        }
+        // หาเวลาตั้งต้นผ่านฟังก์ชันแปลงอัจฉริยะ
+        let startMs = parseDateToMs(v.createdAt) || parseDateToMs(v.id) || Date.now();
 
         const slaDays = Math.max(0, Math.floor((slaEndTime - startMs) / (1000 * 60 * 60 * 24)));
         return { applicantCount, computedStatus, slaDays, matchedApplicants };
