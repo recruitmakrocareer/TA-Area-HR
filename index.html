@@ -491,7 +491,8 @@
           branchName: addingApplicantFor.branchName, 
           position: addingApplicantFor.position,
           ...formData, 
-          timestamp: new Date().toLocaleString('th-TH') 
+          timestamp: new Date().toLocaleString('th-TH'),
+          updatedAt: Date.now() // บันทึกเวลาเพื่อหยุด SLA
         };
         
         const newApps = [newRecord, ...applicants];
@@ -532,7 +533,7 @@
           editAppForm.comment = '';
         }
 
-        const newApps = applicants.map(a => String(a.id) === String(editAppId) ? editAppForm : a);
+        const newApps = applicants.map(a => String(a.id) === String(editAppId) ? { ...editAppForm, updatedAt: Date.now() } : a);
         setApplicants(newApps);
         setEditAppId(null);
         syncToCloud(newApps, vacancies);
@@ -543,7 +544,7 @@
         if (['อื่นๆ', 'ไม่ผ่าน', 'ไม่มาเริ่มงาน', 'รอเริ่มงาน'].includes(newStatus)) {
           startEditApp({ ...app, status: newStatus });
         } else {
-          const updatedApp = { ...app, status: newStatus, comment: '', startDate: '' };
+          const updatedApp = { ...app, status: newStatus, comment: '', startDate: '', updatedAt: Date.now() };
           const newApps = applicants.map(a => String(a.id) === String(app.id) ? updatedApp : a);
           setApplicants(newApps);
           syncToCloud(newApps, vacancies);
@@ -639,7 +640,7 @@
         syncToCloud(applicants, newVacs);
       };
 
-      // --- DERIVED DATA ---
+      // --- DERIVED DATA & SLA LOGIC ---
       const availableBranchesForAreas = appBranches.filter(b => selectedAreas.includes(b.area));
       const filteredVacancies = vacancies.filter(v => selectedAreas.length === 0 || selectedAreas.includes(v.area));
 
@@ -652,7 +653,16 @@
           else if (matchedApplicants.some(app => app.status === 'รอเริ่มงาน')) computedStatus = 'รอเริ่มงาน';
           else if (matchedApplicants.some(app => app.status === 'ตรวจสุขภาพ')) computedStatus = 'รอตรวจสุขภาพ';
         }
-        const slaDays = Math.max(0, Math.floor((Date.now() - createdAt) / (1000 * 60 * 60 * 24)));
+        
+        // SLA Logic: หยุดนับเมื่อมีผู้สมัครสถานะ "รอเริ่มงาน" หรือ "มาเริ่มงาน"
+        let slaEndTime = Date.now();
+        const hiredApps = matchedApplicants.filter(app => ['รอเริ่มงาน', 'มาเริ่มงาน'].includes(app.status));
+        if (hiredApps.length > 0) {
+          // หาเวลาที่เร็วที่สุดที่ผู้สมัครถูกปรับสถานะเป็นรอเริ่มงาน
+          slaEndTime = Math.min(...hiredApps.map(a => a.updatedAt || parseInt(a.id) || Date.now()));
+        }
+
+        const slaDays = Math.max(0, Math.floor((slaEndTime - createdAt) / (1000 * 60 * 60 * 24)));
         return { applicantCount, computedStatus, slaDays, matchedApplicants };
       };
 
@@ -719,7 +729,7 @@
         ];
         vacancies.forEach(v => {
           if (v.manualStatus !== 'Closed') {
-            const slaDays = Math.max(0, Math.floor((Date.now() - v.createdAt) / (1000 * 60 * 60 * 24)));
+            const { slaDays } = getVacancyInsights(v.branchCode, v.position, v.manualStatus, v.createdAt);
             if (slaDays <= 14) buckets[0].count++;
             else if (slaDays <= 30) buckets[1].count++;
             else if (slaDays <= 45) buckets[2].count++;
@@ -727,7 +737,7 @@
           }
         });
         return buckets;
-      }, [vacancies]);
+      }, [vacancies, applicants]); // โยง applicants เพื่อให้กราฟอัปเดตเมื่อ SLA ของผู้สมัครหยุดลง
 
 
       // --- COMPONENTS ---
@@ -935,7 +945,7 @@
 
                               // โหมดแสดงผลปกติ
                               const { applicantCount, computedStatus, slaDays, matchedApplicants } = getVacancyInsights(v.branchCode, v.position, v.manualStatus, v.createdAt);
-                              const isHiringAlert = computedStatus === 'Hiring' && v.manualStatus !== 'Closed';
+                              const isHiringAlert = computedStatus === 'Hiring' || computedStatus === 'รอเริ่มงาน';
 
                               return (
                                 <tr key={v.id} className={`transition-colors ${isHiringAlert ? 'bg-emerald-50/40 hover:bg-emerald-50' : 'hover:bg-slate-50/50'}`}>
