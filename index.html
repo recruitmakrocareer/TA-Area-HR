@@ -4,18 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>HR Recruitment Workspace</title>
-  
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- Babel for JSX -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  
-  <!-- SheetJS for Excel/CSV Parsing and Export -->
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-
   <style>
-    /* Custom Scrollbar */
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
@@ -23,72 +15,36 @@
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #F8FAFC; }
     .hide-scrollbar::-webkit-scrollbar { display: none; }
     .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    
-    /* Custom Select for Badges */
     .status-select {
-      -webkit-appearance: none;
-      -moz-appearance: none;
-      appearance: none;
+      -webkit-appearance: none; -moz-appearance: none; appearance: none;
       background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-      background-repeat: no-repeat;
-      background-position: right 0.4rem center;
-      background-size: 1em;
-      padding-right: 1.6rem;
+      background-repeat: no-repeat; background-position: right 0.4rem center; background-size: 1em; padding-right: 1.6rem;
     }
   </style>
 </head>
 <body>
   <div id="root"></div>
-
-  <!-- React Code -->
   <script type="text/babel" data-type="module">
     import React, { useState, useMemo, useEffect } from 'https://esm.sh/react@18.2.0';
     import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
     import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'https://esm.sh/recharts@2.12.0?deps=react@18.2.0,react-dom@18.2.0';
     import { Users, UserPlus, BarChart3, Building2, CheckCircle2, Clock, MapPin, Search, AlertCircle, FileText, Briefcase, Phone, MessageSquare, Map, Target, Edit, Trash2, X, BellRing, Download, Paperclip, Upload, Eye, PlusCircle, Settings, Check } from 'https://esm.sh/lucide-react@0.344.0?deps=react@18.2.0';
 
-    // ==========================================
-    // ⚙️ การตั้งค่า GOOGLE SHEETS API
-    // ==========================================
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzM4EXsW141-nqY7rRwU_MFc9vnrJSbK-8Wdwn-ZJwvfEBlNMZJH2dhE0r2C4uJf7mnxg/exec"; 
 
-    // --- MOCK DATA ---
     const DEFAULT_TAS = ['TA 1 (คุณเอ)', 'TA 2 (คุณบี)', 'TA 3 (คุณซี)', 'TA 4 (คุณดี)'];
     const DEFAULT_POSITIONS = [
       { position: 'ผู้จัดการสาขา', recruit: '', area: '' },
       { position: 'ผู้ช่วยผู้จัดการสาขา', recruit: '', area: '' },
       { position: 'พนักงานขาย', recruit: '', area: '' },
-      { position: 'พนักงานแคชเชียร์', recruit: '', area: '' },
-      { position: 'พนักงานจัดเรียงสินค้า', recruit: '', area: '' },
-      { position: 'พนักงานธุรการ', recruit: '', area: '' },
-      { position: 'บัญชี', recruit: '', area: '' }
+      { position: 'พนักงานแคชเชียร์', recruit: '', area: '' }
     ];
 
     const DEFAULT_BRANCHES = [
       { code: '001', name: 'สาขาลาดพร้าว', area: 'Area 5' },
       { code: '002', name: 'สาขาแจ้งวัฒนะ', area: 'Area 10' },
       { code: '003', name: 'สาขาศรีนครินทร์', area: 'Area 11' },
-      { code: '004', name: 'สาขาบางบอน', area: 'Area 1' },
-      { code: '005', name: 'สาขาชลบุรี', area: 'Area 9' },
-      { code: '006', name: 'สาขาเชียงใหม่ 1 (ตลาดเมืองใหม่)', area: 'Area 6' },
-      { code: '007', name: 'สาขานครราชสีมา', area: 'Area 2' },
-      { code: '008', name: 'สาขารังสิต', area: 'Area 11' },
-      { code: '009', name: 'สาขาหาดใหญ่', area: 'Area 4' },
-      { code: '010', name: 'สาขาอุดรธานี', area: 'Area 7' },
-      { code: '011', name: 'สาขาพิษณุโลก', area: 'Area 2' },
-      { code: '012', name: 'สาขาขอนแก่น', area: 'Area 7' },
-      { code: '013', name: 'สาขาสุราษฏร์ธานี', area: 'Area 4' },
-      { code: '014', name: 'สาขาอุบลราชธานี', area: 'Area 8' },
-      { code: '015', name: 'สาขาระยอง', area: 'Area 14' },
-      { code: '016', name: 'สาขานครสวรรค์', area: 'Area 2' },
-      { code: '017', name: 'สาขาจรัญสนิทวงศ์', area: 'Area 10' },
-      { code: '018', name: 'สาขาสาทร', area: 'Area 13' },
-      { code: '019', name: 'สาขานครปฐม', area: 'Area 5' },
-      { code: '020', name: 'สาขาสุรินทร์', area: 'Area 8' },
-      { code: '021', name: 'สาขาสามเสน', area: 'Area 13' },
-      { code: '022', name: 'สาขานครศรีธรรมราช', area: 'Area 4' },
-      { code: '023', name: 'สาขาเชียงราย', area: 'Area 6' },
-      { code: '122', name: 'สาขาประชาอุทิศ', area: 'Area 3' }
+      { code: '004', name: 'สาขาบางบอน', area: 'Area 1' }
     ];
 
     const STATUSES = ['รอสัมภาษณ์', 'ไม่เข้าสัมภาษณ์', 'ผ่าน', 'ไม่ผ่าน', 'สำรอง', 'ตรวจสุขภาพ', 'รอเริ่มงาน', 'มาเริ่มงาน', 'ไม่มาเริ่มงาน', 'อื่นๆ'];
@@ -97,7 +53,6 @@
     const STATUS_COLORS = { 'รอสัมภาษณ์': '#F59E0B', 'ไม่เข้าสัมภาษณ์': '#64748B', 'ผ่าน': '#10B981', 'ไม่ผ่าน': '#EF4444', 'สำรอง': '#3B82F6', 'ตรวจสุขภาพ': '#8B5CF6', 'รอเริ่มงาน': '#0EA5E9', 'มาเริ่มงาน': '#059669', 'ไม่มาเริ่มงาน': '#94A3B8', 'อื่นๆ': '#F97316' };
     const VACANCY_COLORS = { 'Vacant': '#F59E0B', 'Promote&Transfer': '#8B5CF6', 'Hold': '#64748B', 'Closed': '#94A3B8', 'รอตรวจสุขภาพ': '#0EA5E9', 'รอเริ่มงาน': '#0EA5E9', 'Hiring': '#10B981' };
 
-    // --- HELPER FUNCTION: ตัวแปลงวันที่ขั้นเทพ (แก้ปัญหา SLA ไม่ขึ้น) ---
     const parseDateToMs = (val) => {
       if (!val) return null;
       let cleanStr = String(val).replace(/,/g, '').trim();
@@ -125,12 +80,11 @@
       return null;
     };
 
-    // --- HELPER FUNCTION: ฟอร์แมตเวลาบันทึกข้อมูล (แก้ปัญหา Timestamp หน้าตาไม่เหมือนกันในชีต) ---
     const getConsistentTimestamp = () => {
       const d = new Date();
       const day = String(d.getDate()).padStart(2, '0');
       const month = String(d.getMonth() + 1).padStart(2, '0');
-      const year = d.getFullYear(); // ใช้ ค.ศ. เสมอ เพื่อให้ Sheets เข้าใจง่าย
+      const year = d.getFullYear();
       const hrs = String(d.getHours()).padStart(2, '0');
       const mins = String(d.getMinutes()).padStart(2, '0');
       const secs = String(d.getSeconds()).padStart(2, '0');
@@ -141,7 +95,6 @@
       const [activeTab, setActiveTab] = useState('area_hr');
       const [isLoading, setIsLoading] = useState(true); 
       const [cloudStatus, setCloudStatus] = useState('loading'); 
-      
       const [appBranches, setAppBranches] = useState([]);
       const [appAreas, setAppAreas] = useState([]);
       const [appTAs, setAppTAs] = useState([]);
@@ -164,9 +117,7 @@
       const [editVacForm, setEditVacForm] = useState({});
       const [dashboardTA, setDashboardTA] = useState('ALL');
 
-      const uniquePositionNames = useMemo(() => {
-        return [...new Set(appPositions.map(p => p.position))];
-      }, [appPositions]);
+      const uniquePositionNames = useMemo(() => [...new Set(appPositions.map(p => p.position))], [appPositions]);
 
       useEffect(() => {
         const normalizePositions = (positions) => {
@@ -183,7 +134,6 @@
         const initLoad = async () => {
           setIsLoading(true);
           setCloudStatus('loading');
-          
           let isCloudSuccess = false;
           let loadedApps = [];
           let loadedVacs = [];
@@ -195,44 +145,30 @@
               isCloudSuccess = true;
               setCloudStatus('connected');
               
-              if (data.applicants) {
-                loadedApps = data.applicants.map(a => ({...a, id: String(a.id), branchCode: String(a.branchCode).padStart(3, '0')}));
-              }
-              if (data.vacancies) {
-                loadedVacs = data.vacancies.map(v => ({...v, id: String(v.id), branchCode: String(v.branchCode).padStart(3, '0')}));
-              }
-
+              if (data.applicants) loadedApps = data.applicants.map(a => ({...a, id: String(a.id), branchCode: String(a.branchCode).padStart(3, '0')}));
+              if (data.vacancies) loadedVacs = data.vacancies.map(v => ({...v, id: String(v.id), branchCode: String(v.branchCode).padStart(3, '0')}));
               if (data.branches && data.branches.length > 0) setAppBranches(data.branches.map(b => ({...b, code: String(b.code).padStart(3, '0')})));
               else setAppBranches(DEFAULT_BRANCHES);
-              
               if (data.tas && data.tas.length > 0) setAppTAs(data.tas.map(t => String(t.name || t)));
               else setAppTAs(DEFAULT_TAS);
-              
               if (data.positions && data.positions.length > 0) setAppPositions(normalizePositions(data.positions));
               else setAppPositions(DEFAULT_POSITIONS);
             }
           } catch (e) {
-            console.error("ดึงข้อมูลจาก Cloud ไม่สำเร็จ, ใช้ข้อมูลสำรองในเครื่อง", e);
+            console.error("ดึงข้อมูลจาก Cloud ไม่สำเร็จ", e);
             setCloudStatus('error');
-            
             let localApps = localStorage.getItem('hr_applicants');
             let localVacs = localStorage.getItem('hr_vacancies');
-            
             if (localApps) loadedApps = JSON.parse(localApps);
             if (localVacs) loadedVacs = JSON.parse(localVacs);
-            
             const localBranches = localStorage.getItem('hr_branches');
             if (localBranches) { try { setAppBranches(JSON.parse(localBranches)); } catch(err) {} }
             else setAppBranches(DEFAULT_BRANCHES);
-            
             const localTAs = localStorage.getItem('hr_tas');
             if (localTAs) { try { setAppTAs(JSON.parse(localTAs)); } catch(e) {} }
             else setAppTAs(DEFAULT_TAS);
-
             const localPositions = localStorage.getItem('hr_positions');
-            if (localPositions) { 
-              try { setAppPositions(normalizePositions(JSON.parse(localPositions))); } catch(e) {} 
-            }
+            if (localPositions) { try { setAppPositions(normalizePositions(JSON.parse(localPositions))); } catch(e) {} }
             else setAppPositions(DEFAULT_POSITIONS);
           }
 
@@ -260,7 +196,6 @@
             syncToCloud(loadedApps, loadedVacs, true);
           }
         };
-        
         initLoad();
       }, []);
 
@@ -278,200 +213,115 @@
       const syncToCloud = async (newApps, newVacs, forceSync = false) => {
         localStorage.setItem('hr_applicants', JSON.stringify(newApps));
         localStorage.setItem('hr_vacancies', JSON.stringify(newVacs));
-        
         const isSafeToSync = forceSync || cloudStatus === 'connected' || cloudStatus === 'syncing';
-
         if (!isSafeToSync) {
-            alert('⚠️ [คำเตือน] ขณะนี้คุณอยู่ใน "โหมดออฟไลน์"\nระบบจะบันทึกข้อมูลไว้ในเครื่องชั่วคราวเท่านั้น แต่จะไม่ถูกส่งขึ้นส่วนกลาง เพื่อป้องกันการลบทับข้อมูลของเพื่อนร่วมงานครับ\n\n(กรุณารีเฟรชหน้าจอใหม่เมื่ออินเทอร์เน็ตพร้อมใช้งาน)');
+            alert('⚠️ คุณอยู่ใน "โหมดออฟไลน์" ระบบจะบันทึกในเครื่องเท่านั้น ไม่ส่งขึ้นระบบกลางป้องกันการลบทับ');
             return;
         }
-
         if (GOOGLE_SCRIPT_URL) {
           try {
             setCloudStatus('syncing');
             await fetch(GOOGLE_SCRIPT_URL, {
-              method: 'POST',
-              mode: 'no-cors',
-              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
               body: JSON.stringify({ action: 'saveAll', applicants: newApps, vacancies: newVacs })
             });
             setTimeout(() => setCloudStatus('connected'), 1000);
-          } catch (error) {
-            console.error('Sync Error:', error);
-            setCloudStatus('error');
-          }
+          } catch (error) { setCloudStatus('error'); }
         }
       };
 
       const syncMasterToCloud = async (newBranches, newTAs, newPositions) => {
-        if (cloudStatus === 'error') {
-            alert('❌ ไม่สามารถอัปเดตไฟล์ Master ได้ เนื่องจากคุณอยู่ในโหมดออฟไลน์');
-            return;
-        }
-
-        setIsLoading(true);
-        setCloudStatus('syncing');
+        if (cloudStatus === 'error') { alert('❌ ออฟไลน์อยู่ อัปเดต Master ไม่ได้'); return; }
+        setIsLoading(true); setCloudStatus('syncing');
         if (GOOGLE_SCRIPT_URL) {
           try {
             await fetch(GOOGLE_SCRIPT_URL, {
-              method: 'POST',
-              mode: 'no-cors',
-              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-              body: JSON.stringify({ 
-                action: 'updateMaster', 
-                branches: newBranches, 
-                tas: newTAs.map(name => ({name})), 
-                positions: newPositions 
-              })
+              method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify({ action: 'updateMaster', branches: newBranches, tas: newTAs.map(name => ({name})), positions: newPositions })
             });
-            setCloudStatus('connected');
-            alert('อัปเดตข้อมูล Master Data ขึ้นระบบส่วนกลางสำเร็จ!');
-          } catch (error) {
-            console.error('Sync Master Error:', error);
-            setCloudStatus('error');
-            alert('อัปเดตข้อมูลไม่สำเร็จ โปรดตรวจสอบการเชื่อมต่ออินเทอร์เน็ต');
-          }
+            setCloudStatus('connected'); alert('อัปเดต Master Data สำเร็จ!');
+          } catch (error) { setCloudStatus('error'); alert('อัปเดตไม่สำเร็จ ตรวจสอบอินเทอร์เน็ต'); }
         }
         setIsLoading(false);
       };
 
       const handleImportCSV = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+        const file = e.target.files[0]; if (!file) return;
         const reader = new FileReader();
         reader.onload = (evt) => {
           try {
-            const bstr = evt.target.result;
-            const wb = XLSX.read(bstr, { type: 'binary' });
-            const wsname = wb.SheetNames[0];
-            const data = XLSX.utils.sheet_to_json(wb.Sheets[wsname], { header: 1 });
-            
+            const wb = XLSX.read(evt.target.result, { type: 'binary' });
+            const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
             const newBranches = [];
             for (let i = 1; i < data.length; i++) {
-              const row = data[i];
-              if (row && row[0] && row[1] && row[2]) {
-                const code = String(row[0]).padStart(3, '0');
-                const name = String(row[1]).replace(/\n/g, ' ').replace(/\r/g, '').trim();
-                const area = String(row[2]).replace(/\r/g, '').trim();
-                newBranches.push({ code, name, area });
+              if (data[i] && data[i][0] && data[i][1] && data[i][2]) {
+                newBranches.push({ code: String(data[i][0]).padStart(3, '0'), name: String(data[i][1]).replace(/\n|\r/g, '').trim(), area: String(data[i][2]).replace(/\r/g, '').trim() });
               }
             }
-
             if (newBranches.length > 0) {
-              setAppBranches(newBranches);
-              localStorage.setItem('hr_branches', JSON.stringify(newBranches));
+              setAppBranches(newBranches); localStorage.setItem('hr_branches', JSON.stringify(newBranches));
               syncMasterToCloud(newBranches, appTAs, appPositions);
-            } else {
-              alert('ไม่พบข้อมูลในไฟล์ หรือรูปแบบคอลัมน์ไม่ถูกต้อง (ต้องมี Store No., Location Name, Area No.)');
-            }
-          } catch (err) {
-            console.error(err);
-            alert('เกิดข้อผิดพลาดในการอ่านไฟล์ CSV สาขา');
-          }
+            } else alert('ไม่พบข้อมูล หรือรูปแบบคอลัมน์ไม่ถูกต้อง');
+          } catch (err) { alert('เกิดข้อผิดพลาดในการอ่านไฟล์'); }
         };
         reader.readAsBinaryString(file);
       };
 
       const handleImportPositionCSV = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+        const file = e.target.files[0]; if (!file) return;
         const reader = new FileReader();
         reader.onload = (evt) => {
           try {
-            const bstr = evt.target.result;
-            const wb = XLSX.read(bstr, { type: 'binary' });
-            const wsname = wb.SheetNames[0];
-            const data = XLSX.utils.sheet_to_json(wb.Sheets[wsname], { header: 1 });
-            
-            const newPositions = [];
-            const newTAsSet = new Set(appTAs);
-            let foundNewTA = false;
-
+            const wb = XLSX.read(evt.target.result, { type: 'binary' });
+            const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+            const newPositions = []; const newTAsSet = new Set(appTAs); let foundNewTA = false;
             for (let i = 1; i < data.length; i++) {
-              const row = data[i];
-              if (row && row[0]) {
-                const posName = String(row[0]).replace(/\r/g, '').trim();
-                const recruitName = row[1] ? String(row[1]).replace(/\r/g, '').trim() : '';
-                const areaName = row[2] ? String(row[2]).replace(/\r/g, '').trim() : '';
-                
+              if (data[i] && data[i][0]) {
+                const posName = String(data[i][0]).replace(/\r/g, '').trim();
+                const recruitName = data[i][1] ? String(data[i][1]).replace(/\r/g, '').trim() : '';
+                const areaName = data[i][2] ? String(data[i][2]).replace(/\r/g, '').trim() : '';
                 if (posName) {
                   newPositions.push({ position: posName, recruit: recruitName, area: areaName });
-                  if (recruitName && !newTAsSet.has(recruitName)) {
-                    newTAsSet.add(recruitName);
-                    foundNewTA = true;
-                  }
+                  if (recruitName && !newTAsSet.has(recruitName)) { newTAsSet.add(recruitName); foundNewTA = true; }
                 }
               }
             }
-
             if (newPositions.length > 0) {
-              setAppPositions(newPositions);
-              localStorage.setItem('hr_positions', JSON.stringify(newPositions));
-              
+              setAppPositions(newPositions); localStorage.setItem('hr_positions', JSON.stringify(newPositions));
               const updatedTAs = Array.from(newTAsSet);
-              if (foundNewTA) {
-                setAppTAs(updatedTAs);
-                localStorage.setItem('hr_tas', JSON.stringify(updatedTAs));
-              }
-              
+              if (foundNewTA) { setAppTAs(updatedTAs); localStorage.setItem('hr_tas', JSON.stringify(updatedTAs)); }
               syncMasterToCloud(appBranches, updatedTAs, newPositions);
-              
-              if (foundNewTA) {
-                alert(`อัปเดตตำแหน่งงานสำเร็จ!\n- นำเข้าตำแหน่งและเงื่อนไข Area ทั้งหมด ${newPositions.length} รายการ\n- อัปเดตรายชื่อ TA ให้อัตโนมัติ (พบรายชื่อใหม่)`);
-              } else {
-                alert(`อัปเดตตำแหน่งงานและผู้รับผิดชอบสำเร็จ! นำเข้าทั้งหมด ${newPositions.length} รายการ`);
-              }
-            } else {
-              alert('ไม่พบข้อมูลในไฟล์ (ข้อมูลตำแหน่งงานต้องอยู่ในคอลัมน์แรกสุด)');
-            }
-          } catch (err) {
-            console.error(err);
-            alert('เกิดข้อผิดพลาดในการอ่านไฟล์ CSV ตำแหน่งงาน');
-          }
+              alert(`อัปเดตสำเร็จ! ตำแหน่งทั้งหมด ${newPositions.length} รายการ`);
+            } else alert('ไม่พบข้อมูลตำแหน่งในคอลัมน์แรก');
+          } catch (err) { alert('เกิดข้อผิดพลาดในการอ่านไฟล์'); }
         };
         reader.readAsBinaryString(file);
       };
 
       const handleImportTACSV = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+        const file = e.target.files[0]; if (!file) return;
         const reader = new FileReader();
         reader.onload = (evt) => {
           try {
-            const bstr = evt.target.result;
-            const wb = XLSX.read(bstr, { type: 'binary' });
-            const wsname = wb.SheetNames[0];
-            const data = XLSX.utils.sheet_to_json(wb.Sheets[wsname], { header: 1 });
-            
+            const wb = XLSX.read(evt.target.result, { type: 'binary' });
+            const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
             const newTAs = [];
             for (let i = 1; i < data.length; i++) {
-              const row = data[i];
-              if (row && row[0]) {
-                const taName = String(row[0]).replace(/\r/g, '').trim();
-                if (taName) newTAs.push(taName);
-              }
+              if (data[i] && data[i][0]) newTAs.push(String(data[i][0]).replace(/\r/g, '').trim());
             }
-
             if (newTAs.length > 0) {
-              setAppTAs(newTAs);
-              localStorage.setItem('hr_tas', JSON.stringify(newTAs));
+              setAppTAs(newTAs); localStorage.setItem('hr_tas', JSON.stringify(newTAs));
               syncMasterToCloud(appBranches, newTAs, appPositions);
-            } else {
-              alert('ไม่พบข้อมูลในไฟล์ (ข้อมูลชื่อ TA ต้องอยู่ในคอลัมน์แรกสุด)');
-            }
-          } catch (err) {
-            console.error(err);
-            alert('เกิดข้อผิดพลาดในการอ่านไฟล์ CSV รายชื่อ TA');
-          }
+            } else alert('ไม่พบข้อมูล TA');
+          } catch (err) { alert('ข้อผิดพลาดในการอ่านไฟล์'); }
         };
         reader.readAsBinaryString(file);
       };
 
       const exportToExcel = (dataList, filename) => {
-        const worksheet = XLSX.utils.json_to_sheet(dataList);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
-        XLSX.writeFile(workbook, `${filename}.xlsx`);
+        const ws = XLSX.utils.json_to_sheet(dataList);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Data"); XLSX.writeFile(wb, `${filename}.xlsx`);
       };
 
       const handleInputChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -480,9 +330,7 @@
         const file = e.target.files[0];
         if (file) {
           const reader = new FileReader();
-          reader.onloadend = () => {
-            setFormData(prev => ({ ...prev, resumeBase64: reader.result, resumeName: file.name }));
-          };
+          reader.onloadend = () => setFormData(prev => ({ ...prev, resumeBase64: reader.result, resumeName: file.name }));
           reader.readAsDataURL(file);
         }
       };
@@ -490,62 +338,34 @@
       const handleRecruitSubmit = async (e) => {
         e.preventDefault();
         if (!selectedTA || !addingApplicantFor) return;
-        
-        if (formData.status === 'รอเริ่มงาน' && !formData.startDate) {
-          alert('กรุณาระบุวันที่เริ่มงาน');
-          return;
-        }
+        if (formData.status === 'รอเริ่มงาน' && !formData.startDate) { alert('กรุณาระบุวันที่เริ่มงาน'); return; }
         
         const newRecord = { 
-          id: Date.now().toString(), 
-          ta: selectedTA, 
-          branchCode: String(addingApplicantFor.branchCode).padStart(3, '0'), 
-          branchName: addingApplicantFor.branchName, 
-          position: addingApplicantFor.position,
-          ...formData, 
-          timestamp: getConsistentTimestamp(), // เปลี่ยนมาใช้ตัวฟอร์แมตเวลามาตรฐาน
-          updatedAt: Date.now() 
+          id: Date.now().toString(), ta: selectedTA, branchCode: String(addingApplicantFor.branchCode).padStart(3, '0'), 
+          branchName: addingApplicantFor.branchName, position: addingApplicantFor.position, ...formData, 
+          timestamp: getConsistentTimestamp(), updatedAt: Date.now() 
         };
-        
         const newApps = [newRecord, ...applicants];
         setApplicants(newApps);
         setFormData({ name: '', phone: '', status: '', comment: '', startDate: '', resumeName: '', resumeBase64: '' });
-        setAddingApplicantFor(null);
-        
-        syncToCloud(newApps, vacancies);
+        setAddingApplicantFor(null); syncToCloud(newApps, vacancies);
       };
 
       const deleteApplicant = (id) => {
-        if (window.confirm('คุณแน่ใจหรือไม่ที่จะลบข้อมูลผู้สมัครรายนี้?')) {
+        if (window.confirm('ลบข้อมูลผู้สมัครรายนี้?')) {
           const newApps = applicants.filter(a => String(a.id) !== String(id));
-          setApplicants(newApps);
-          syncToCloud(newApps, vacancies);
+          setApplicants(newApps); syncToCloud(newApps, vacancies);
         }
       };
 
-      const startEditApp = (app) => {
-        setEditAppId(app.id);
-        setEditAppForm({ ...app });
-      };
-
+      const startEditApp = (app) => { setEditAppId(app.id); setEditAppForm({ ...app }); };
       const saveEditApp = () => {
-        if (['อื่นๆ', 'ไม่ผ่าน', 'ไม่มาเริ่มงาน'].includes(editAppForm.status) && !editAppForm.comment) {
-          alert('กรุณาระบุเหตุผลในช่องที่กำหนด');
-          return;
-        }
-        if (editAppForm.status === 'รอเริ่มงาน' && !editAppForm.startDate) {
-          alert('กรุณาระบุวันที่เริ่มงาน');
-          return;
-        }
+        if (['อื่นๆ', 'ไม่ผ่าน', 'ไม่มาเริ่มงาน'].includes(editAppForm.status) && !editAppForm.comment) { alert('กรุณาระบุเหตุผล'); return; }
+        if (editAppForm.status === 'รอเริ่มงาน' && !editAppForm.startDate) { alert('กรุณาระบุวันที่เริ่มงาน'); return; }
+        if (!['อื่นๆ', 'ไม่ผ่าน', 'ไม่มาเริ่มงาน'].includes(editAppForm.status)) editAppForm.comment = '';
         
-        if (!['อื่นๆ', 'ไม่ผ่าน', 'ไม่มาเริ่มงาน'].includes(editAppForm.status)) {
-          editAppForm.comment = '';
-        }
-
         const newApps = applicants.map(a => String(a.id) === String(editAppId) ? { ...editAppForm, updatedAt: Date.now() } : a);
-        setApplicants(newApps);
-        setEditAppId(null);
-        syncToCloud(newApps, vacancies);
+        setApplicants(newApps); setEditAppId(null); syncToCloud(newApps, vacancies);
       };
 
       const handleInlineStatusChange = (app, newStatus) => {
@@ -554,8 +374,7 @@
         } else {
           const updatedApp = { ...app, status: newStatus, comment: '', startDate: '', updatedAt: Date.now() };
           const newApps = applicants.map(a => String(a.id) === String(app.id) ? updatedApp : a);
-          setApplicants(newApps);
-          syncToCloud(newApps, vacancies);
+          setApplicants(newApps); syncToCloud(newApps, vacancies);
         }
       };
 
@@ -563,85 +382,43 @@
         setSelectedAreas(prev => prev.includes(area) ? prev.filter(a => a !== area) : [...prev, area]);
         setVacancyForm(prev => ({...prev, branchCode: ''}));
       };
+      
       const handleVacancyInputChange = (e) => setVacancyForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
-
       const handleVacancySubmit = (e) => {
         e.preventDefault();
         const branch = appBranches.find(b => String(b.code) === String(vacancyForm.branchCode));
-        if (!branch) { 
-          alert('เกิดข้อผิดพลาด: ไม่พบข้อมูลสาขาในระบบ กรุณาเลือกสาขาใหม่'); 
-          return; 
-        }
-
-        const isDuplicate = vacancies.some(v => 
-          String(v.branchCode) === String(branch.code) && 
-          String(v.position) === String(vacancyForm.position) && 
-          v.manualStatus !== 'Closed'
-        );
-        if (isDuplicate) { alert(`มีตำแหน่ง "${vacancyForm.position}" เปิดรับในสาขานี้อยู่แล้ว!`); return; }
+        if (!branch) { alert('ไม่พบข้อมูลสาขาในระบบ'); return; }
+        const isDuplicate = vacancies.some(v => String(v.branchCode) === String(branch.code) && String(v.position) === String(vacancyForm.position) && v.manualStatus !== 'Closed');
+        if (isDuplicate) { alert(`มีตำแหน่งเปิดรับอยู่แล้ว!`); return; }
 
         const newVacancy = { 
-          id: Date.now().toString(), 
-          area: branch.area, 
-          branchCode: String(branch.code).padStart(3, '0'), 
-          branchName: branch.name, 
-          position: vacancyForm.position, 
-          manualStatus: vacancyForm.manualStatus, 
-          createdAt: Date.now(), 
-          timestamp: getConsistentTimestamp() // เปลี่ยนมาใช้ตัวฟอร์แมตเวลามาตรฐาน
+          id: Date.now().toString(), area: branch.area, branchCode: String(branch.code).padStart(3, '0'), 
+          branchName: branch.name, position: vacancyForm.position, manualStatus: vacancyForm.manualStatus, 
+          createdAt: Date.now(), timestamp: getConsistentTimestamp() 
         };
-        
         const newVacs = [newVacancy, ...vacancies];
-        setVacancies(newVacs);
-        setVacancyForm({ branchCode: '', position: '', manualStatus: 'Vacant' });
-        
+        setVacancies(newVacs); setVacancyForm({ branchCode: '', position: '', manualStatus: 'Vacant' });
         syncToCloud(applicants, newVacs);
-        
-        if (GOOGLE_SCRIPT_URL && cloudStatus === 'connected') {
-          try {
-            fetch(GOOGLE_SCRIPT_URL, {
-              method: 'POST',
-              mode: 'no-cors',
-              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-              body: JSON.stringify({ action: 'notifyNewVacancy', vacancy: newVacancy })
-            });
-          } catch (error) { console.error('Email Error:', error); }
-        }
       };
 
       const deleteVacancy = (id) => {
-        if (window.confirm('คุณแน่ใจหรือไม่ที่จะลบตำแหน่งงานนี้?')) {
-          const newVacs = vacancies.filter(v => String(v.id) !== String(id));
-          setVacancies(newVacs);
-          syncToCloud(applicants, newVacs);
+        if (window.confirm('ลบตำแหน่งงานนี้?')) {
+          setVacancies(vacancies.filter(v => String(v.id) !== String(id))); syncToCloud(applicants, vacancies.filter(v => String(v.id) !== String(id)));
         }
       };
 
-      const startEditVac = (v) => {
-        setEditVacId(v.id);
-        setEditVacForm({ ...v });
-      };
-
+      const startEditVac = (v) => { setEditVacId(v.id); setEditVacForm({ ...v }); };
       const saveEditVac = () => {
-        const isDuplicate = vacancies.some(v => 
-          String(v.id) !== String(editVacId) && 
-          String(v.branchCode) === String(editVacForm.branchCode) && 
-          String(v.position) === String(editVacForm.position) && 
-          v.manualStatus !== 'Closed'
-        );
-        if (isDuplicate) { alert(`มีตำแหน่ง "${editVacForm.position}" เปิดรับในสาขานี้อยู่แล้ว!`); return; }
-        
+        const isDuplicate = vacancies.some(v => String(v.id) !== String(editVacId) && String(v.branchCode) === String(editVacForm.branchCode) && String(v.position) === String(editVacForm.position) && v.manualStatus !== 'Closed');
+        if (isDuplicate) { alert(`มีตำแหน่งนี้เปิดรับอยู่แล้ว!`); return; }
         const branch = appBranches.find(b => String(b.code) === String(editVacForm.branchCode));
         const newVacs = vacancies.map(v => String(v.id) === String(editVacId) ? { ...editVacForm, area: branch ? branch.area : v.area, branchName: branch ? branch.name : v.branchName } : v);
-        setVacancies(newVacs);
-        setEditVacId(null);
-        syncToCloud(applicants, newVacs);
+        setVacancies(newVacs); setEditVacId(null); syncToCloud(applicants, newVacs);
       };
 
       const closeVacancy = (id) => {
         const newVacs = vacancies.map(v => String(v.id) === String(id) ? { ...v, manualStatus: 'Closed' } : v);
-        setVacancies(newVacs);
-        syncToCloud(applicants, newVacs);
+        setVacancies(newVacs); syncToCloud(applicants, newVacs);
       };
 
       const availableBranchesForAreas = appBranches.filter(b => selectedAreas.includes(b.area));
@@ -660,13 +437,10 @@
         let slaEndTime = Date.now();
         const hiredApps = matchedApplicants.filter(app => ['รอเริ่มงาน', 'มาเริ่มงาน'].includes(app.status));
         if (hiredApps.length > 0) {
-          // ใช้ parseDateToMs ป้องกันเวลาพัง
           slaEndTime = Math.min(...hiredApps.map(a => parseDateToMs(a.updatedAt) || parseDateToMs(a.timestamp) || parseDateToMs(a.id) || Date.now()));
         }
 
-        // หาเวลาเริ่มงาน ผ่านระบบแปลงวันที่ 4 ชั้นสุดแกร่ง
         let startMs = parseDateToMs(v.createdAt) || parseDateToMs(v.timestamp) || parseDateToMs(v.id) || Date.now();
-
         const slaDays = Math.max(0, Math.floor((slaEndTime - startMs) / (1000 * 60 * 60 * 24))) || 0;
         return { applicantCount, computedStatus, slaDays, matchedApplicants };
       };
@@ -676,42 +450,29 @@
           if (v.manualStatus === 'Closed') return false;
           if (recruitAreaFilter && String(v.area) !== String(recruitAreaFilter)) return false;
           if (recruitBranchFilter && String(v.branchCode) !== String(recruitBranchFilter)) return false;
-
           if (selectedTA) {
             const currentTA = String(selectedTA).trim().toLowerCase();
             const vacPos = String(v.position).trim();
             const vacArea = String(v.area).trim().toLowerCase();
-
             const posRules = appPositions.filter(p => String(p.position).trim() === vacPos);
-
             if (posRules.length > 0) {
               let matchingRule = posRules.find(p => {
                 if (!p.area || String(p.area).trim() === '') return false;
-                const ruleAreas = String(p.area).split(',').map(a => a.trim().toLowerCase());
-                return ruleAreas.includes(vacArea);
+                return String(p.area).split(',').map(a => a.trim().toLowerCase()).includes(vacArea);
               });
-
-              if (!matchingRule) {
-                matchingRule = posRules.find(p => !p.area || String(p.area).trim() === '');
-              }
-
+              if (!matchingRule) matchingRule = posRules.find(p => !p.area || String(p.area).trim() === '');
               if (matchingRule) {
                 const assignedRecruit = String(matchingRule.recruit).trim().toLowerCase();
-                if (assignedRecruit !== '' && assignedRecruit !== currentTA) {
-                  return false;
-                }
+                if (assignedRecruit !== '' && assignedRecruit !== currentTA) return false;
               }
             }
           }
-
           return true;
         });
       }, [vacancies, recruitAreaFilter, recruitBranchFilter, appPositions, selectedTA]);
 
       const branchesForRecruitFilter = appBranches.filter(b => !recruitAreaFilter || String(b.area) === String(recruitAreaFilter));
-      
       const myApplicants = applicants.filter(app => String(app.ta) === String(selectedTA));
-
       const dashboardData = useMemo(() => dashboardTA === 'ALL' ? applicants : applicants.filter(app => String(app.ta) === String(dashboardTA)), [applicants, dashboardTA]);
       
       const statusChartData = useMemo(() => {
@@ -725,604 +486,164 @@
       }, [dashboardData]);
 
       const slaChartData = useMemo(() => {
-        const buckets = [
-          { name: '0-14 วัน', count: 0, fill: '#10B981' }, 
-          { name: '15-30 วัน', count: 0, fill: '#F59E0B' }, 
-          { name: '31-45 วัน', count: 0, fill: '#F97316' }, 
-          { name: 'เกิน 45 วัน', count: 0, fill: '#EF4444' } 
-        ];
+        const buckets = [ { name: '0-14 วัน', count: 0, fill: '#10B981' }, { name: '15-30 วัน', count: 0, fill: '#F59E0B' }, { name: '31-45 วัน', count: 0, fill: '#F97316' }, { name: 'เกิน 45 วัน', count: 0, fill: '#EF4444' } ];
         vacancies.forEach(v => {
           if (v.manualStatus !== 'Closed') {
             const { slaDays } = getVacancyInsights(v);
-            if (slaDays <= 14) buckets[0].count++;
-            else if (slaDays <= 30) buckets[1].count++;
-            else if (slaDays <= 45) buckets[2].count++;
-            else buckets[3].count++;
+            if (slaDays <= 14) buckets[0].count++; else if (slaDays <= 30) buckets[1].count++; else if (slaDays <= 45) buckets[2].count++; else buckets[3].count++;
           }
         });
         return buckets;
       }, [vacancies, applicants]); 
 
-
-      // --- COMPONENTS ---
       return (
         <div className="min-h-screen font-sans text-slate-800 pb-10 relative">
-          
-          {/* Loading Overlay */}
           {isLoading && (
             <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center transition-all">
               <div className="bg-white px-8 py-6 rounded-2xl shadow-xl flex flex-col items-center space-y-4 animate-in fade-in zoom-in duration-300">
                 <div className="animate-spin w-12 h-12 border-4 border-blue-100 border-t-blue-600 rounded-full"></div>
-                <span className="font-bold text-slate-700 text-lg">กำลังเชื่อมต่อข้อมูลกับระบบ...</span>
-                <span className="text-xs text-slate-500">กรุณารอสักครู่</span>
+                <span className="font-bold text-slate-700 text-lg">กำลังเชื่อมต่อข้อมูล...</span>
               </div>
             </div>
           )}
 
-          {/* Navbar */}
           <nav className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex flex-col md:flex-row justify-between h-auto md:h-16 py-3 md:py-0">
-                <div className="flex items-center space-x-3 mb-3 md:mb-0">
-                  <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white shadow-sm">
-                    <Users size={20} strokeWidth={2.5} />
-                  </div>
-                  <span className="text-xl font-bold text-slate-900 tracking-tight">HR <span className="text-blue-600 font-black">Recruit</span></span>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between h-auto md:h-16 py-3 md:py-0">
+              <div className="flex items-center space-x-3 mb-3 md:mb-0">
+                <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white"><Users size={20} /></div>
+                <span className="text-xl font-bold text-slate-900 tracking-tight">HR <span className="text-blue-600">Recruit</span></span>
+              </div>
+              <div className="flex items-center justify-between overflow-x-auto w-full md:w-auto space-x-4 hide-scrollbar">
+                <div className="flex space-x-1 bg-slate-100/80 p-1 rounded-xl whitespace-nowrap">
+                  <button onClick={() => setActiveTab('area_hr')} className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg text-sm font-medium ${activeTab === 'area_hr' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}><Briefcase size={16} /><span>Area HR (เปิดงาน)</span></button>
+                  <button onClick={() => setActiveTab('entry')} className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg text-sm font-medium ${activeTab === 'entry' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}><UserPlus size={16} /><span>Recruit (คีย์คน)</span></button>
+                  <button onClick={() => setActiveTab('dashboard')} className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg text-sm font-medium ${activeTab === 'dashboard' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}><BarChart3 size={16} /><span>Dashboard</span></button>
                 </div>
-                
-                {/* Tabs & Import Buttons */}
-                <div className="flex items-center justify-between overflow-x-auto pb-1 md:pb-0 hide-scrollbar w-full md:w-auto space-x-4">
-                  <div className="flex space-x-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/60 whitespace-nowrap">
-                    <button onClick={() => setActiveTab('area_hr')} className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === 'area_hr' ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-900/5' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}>
-                      <Briefcase size={16} strokeWidth={activeTab === 'area_hr' ? 2.5 : 2} /><span>Area HR (ตำแหน่งงาน)</span>
-                    </button>
-                    <button onClick={() => setActiveTab('entry')} className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === 'entry' ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-900/5' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}>
-                      <UserPlus size={16} strokeWidth={activeTab === 'entry' ? 2.5 : 2} /><span>Recruit (คีย์ผู้สมัคร)</span>
-                    </button>
-                    <button onClick={() => setActiveTab('dashboard')} className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === 'dashboard' ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-900/5' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}>
-                      <BarChart3 size={16} strokeWidth={activeTab === 'dashboard' ? 2.5 : 2} /><span>แดชบอร์ดสรุปผล</span>
-                    </button>
+                <div className="flex items-center space-x-2">
+                  <div className="hidden md:flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-50 border border-slate-200">
+                    {cloudStatus === 'loading' && <><div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div><span className="text-slate-600">กำลังเชื่อมต่อ</span></>}
+                    {cloudStatus === 'connected' && <><div className="w-2 h-2 bg-emerald-500 rounded-full"></div><span className="text-emerald-700">ออนไลน์</span></>}
+                    {cloudStatus === 'syncing' && <><div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div><span className="text-blue-700">ซิงค์...</span></>}
+                    {cloudStatus === 'error' && <><div className="w-2 h-2 bg-red-500 rounded-full"></div><span className="text-red-700">ออฟไลน์</span></>}
                   </div>
-
-                  <div className="flex items-center space-x-2">
-                    {/* Status Indicator */}
-                    <div className="hidden md:flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-50 border border-slate-200" title={cloudStatus === 'error' ? "ดึงข้อมูลจาก Cloud ไม่ได้ ระบบจึงปกป้องข้อมูลเก่าโดยห้ามเซฟทับชั่วคราว" : "สถานะการเชื่อมต่อกับระบบส่วนกลาง"}>
-                        {cloudStatus === 'loading' && <><div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div><span className="text-slate-600">กำลังเชื่อมต่อ...</span></>}
-                        {cloudStatus === 'connected' && <><div className="w-2 h-2 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.8)]"></div><span className="text-emerald-700">เชื่อมต่อระบบแล้ว</span></>}
-                        {cloudStatus === 'syncing' && <><div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div><span className="text-blue-700">กำลังซิงค์...</span></>}
-                        {cloudStatus === 'error' && <><div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div><span className="text-red-700">ออฟไลน์ (อ่านจากเครื่อง)</span></>}
-                    </div>
-
-                    <button onClick={() => setShowSettings(true)} className="flex items-center space-x-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 px-3 py-2 rounded-lg transition-colors text-sm font-semibold border border-slate-200 shadow-sm whitespace-nowrap">
-                      <Settings size={16} />
-                      <span className="hidden sm:inline">ตั้งค่า</span>
-                    </button>
-                  </div>
+                  <button onClick={() => setShowSettings(true)} className="flex items-center space-x-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 px-3 py-2 rounded-lg text-sm font-semibold border"><Settings size={16}/><span className="hidden sm:inline">ตั้งค่า</span></button>
                 </div>
               </div>
             </div>
           </nav>
 
           <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            
-            {/* --- TAB: AREA HR --- */}
             {activeTab === 'area_hr' && (
-              <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500 relative">
-                
-                {/* Area Select */}
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8">
-                  <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                      <h2 className="text-lg font-bold text-slate-900 flex items-center space-x-2">
-                        <Map className="text-blue-600" size={22} /><span>เลือกพื้นที่รับผิดชอบ (Area Selection)</span>
-                      </h2>
-                      <p className="text-sm text-slate-500 mt-1 ml-7">คลิกเพื่อเลือก Area ที่ต้องการจัดการ (เลือกได้มากกว่า 1)</p>
-                    </div>
-                    <div className="text-sm font-semibold text-blue-600 bg-blue-50 px-4 py-2 rounded-xl border border-blue-100 shadow-sm">
-                      เลือกอยู่ <span className="text-lg mx-1">{selectedAreas.length}</span> Area
-                    </div>
+              <div className="space-y-6">
+                <div className="bg-white rounded-2xl shadow-sm border p-6">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-lg font-bold flex items-center space-x-2"><Map className="text-blue-600" size={22} /><span>เลือก Area</span></h2>
                   </div>
-                  
-                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-                    {appAreas.map(area => {
-                      const isSelected = selectedAreas.includes(area);
-                      return (
-                        <button 
-                          key={area} 
-                          onClick={() => toggleArea(area)} 
-                          className={`flex items-center justify-center px-2 py-3 rounded-xl text-sm font-bold border transition-all duration-200 transform hover:scale-[1.02] active:scale-95 ${
-                            isSelected 
-                              ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white border-blue-600 shadow-md shadow-blue-500/30' 
-                              : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300 hover:bg-blue-50/50 hover:text-blue-700 shadow-sm'
-                          }`}
-                        >
-                          {area}
-                        </button>
-                      )
-                    })}
+                  <div className="flex flex-wrap gap-3">
+                    {appAreas.map(area => (
+                      <button key={area} onClick={() => toggleArea(area)} className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all ${selectedAreas.includes(area) ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'}`}>{area}</button>
+                    ))}
                   </div>
                 </div>
 
-                {/* Form Add Vacancy */}
                 {selectedAreas.length > 0 && (
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="bg-slate-50/50 border-b border-slate-100 px-6 py-5 flex items-center space-x-3">
-                      <div className="bg-blue-100 text-blue-600 p-2 rounded-lg"><Target size={20} strokeWidth={2} /></div>
-                      <h2 className="text-lg font-bold text-slate-900">เปิดตำแหน่งงานว่างใหม่</h2>
-                    </div>
-                    <form onSubmit={handleVacancySubmit} className="p-6 space-y-6">
+                  <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
+                    <div className="bg-slate-50/50 border-b px-6 py-4 flex items-center space-x-3"><div className="bg-blue-100 text-blue-600 p-2 rounded-lg"><Target size={20}/></div><h2 className="font-bold">เปิดตำแหน่งงานว่างใหม่</h2></div>
+                    <form onSubmit={handleVacancySubmit} className="p-6 space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-2">1. รหัส-ชื่อสาขา <span className="text-red-500">*</span></label>
-                          <select required name="branchCode" value={vacancyForm.branchCode} onChange={handleVacancyInputChange} className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none">
-                            <option value="">-- เลือกสาขาใน Area ที่กำหนด --</option>
-                            {availableBranchesForAreas.map(b => <option key={b.code} value={b.code}>[{b.area}] {b.code} - {b.name}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-2">2. ตำแหน่งงาน <span className="text-red-500">*</span></label>
-                          <select required name="position" value={vacancyForm.position} onChange={handleVacancyInputChange} className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none">
-                            <option value="">-- เลือกตำแหน่งงาน --</option>
-                            {uniquePositionNames.map(pos => <option key={pos} value={pos}>{pos}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-2">3. สถานะเริ่มต้น <span className="text-red-500">*</span></label>
-                          <select required name="manualStatus" value={vacancyForm.manualStatus} onChange={handleVacancyInputChange} className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none">
-                            {VACANCY_STATUSES.filter(s => s !== 'Closed').map(s => <option key={s} value={s}>{s}</option>)}
-                          </select>
-                        </div>
+                        <select required name="branchCode" value={vacancyForm.branchCode} onChange={handleVacancyInputChange} className="w-full border rounded-xl px-4 py-2.5 outline-none focus:border-blue-500"><option value="">-- เลือกสาขา --</option>{availableBranchesForAreas.map(b => <option key={b.code} value={b.code}>[{b.area}] {b.name}</option>)}</select>
+                        <select required name="position" value={vacancyForm.position} onChange={handleVacancyInputChange} className="w-full border rounded-xl px-4 py-2.5 outline-none focus:border-blue-500"><option value="">-- เลือกตำแหน่งงาน --</option>{uniquePositionNames.map(pos => <option key={pos} value={pos}>{pos}</option>)}</select>
+                        <select required name="manualStatus" value={vacancyForm.manualStatus} onChange={handleVacancyInputChange} className="w-full border rounded-xl px-4 py-2.5 outline-none focus:border-blue-500">{VACANCY_STATUSES.filter(s => s !== 'Closed').map(s => <option key={s} value={s}>{s}</option>)}</select>
                       </div>
-                      <div className="flex justify-end pt-2">
-                        <button type="submit" className="bg-slate-800 hover:bg-slate-900 text-white font-semibold py-2.5 px-6 rounded-xl shadow-sm flex items-center space-x-2 transition-colors">
-                          <Briefcase size={16} /><span>บันทึกตำแหน่งงาน</span>
-                        </button>
-                      </div>
+                      <div className="flex justify-end"><button type="submit" className="bg-slate-800 text-white py-2.5 px-6 rounded-xl flex items-center space-x-2"><Briefcase size={16}/><span>บันทึกตำแหน่ง</span></button></div>
                     </form>
                   </div>
                 )}
 
-                {/* Table Vacancies */}
                 {selectedAreas.length > 0 && (
-                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-white flex-wrap gap-4">
-                      <div>
-                        <h3 className="font-bold text-slate-900 text-lg">รายการตำแหน่งงาน (Job Vacancies)</h3>
-                        <p className="text-sm text-slate-500 mt-0.5">คลิกที่ <span className="font-semibold text-blue-600">ไอคอนดินสอ</span> หรือชื่อตำแหน่งเพื่อแก้ไขข้อมูลตรงจุด</p>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <span className="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-2 rounded-lg border border-slate-200">
-                          ทั้งหมด <span className="text-blue-600 text-sm mx-1">{filteredVacancies.length}</span> รายการ
-                        </span>
-                        <button onClick={() => exportToExcel(filteredVacancies, 'Vacancies_Export')} className="flex items-center space-x-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 text-xs font-bold px-3 py-2 rounded-lg transition-colors shadow-sm">
-                          <Download size={14} /><span>Export Excel</span>
-                        </button>
-                      </div>
-                    </div>
-                    
+                  <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
+                    <div className="px-6 py-5 border-b flex justify-between items-center"><h3 className="font-bold text-lg">รายการตำแหน่งงาน (Job Vacancies)</h3><button onClick={() => exportToExcel(filteredVacancies, 'Vacancies')} className="text-xs bg-emerald-50 text-emerald-700 px-3 py-2 rounded-lg border font-bold flex items-center"><Download size={14} className="mr-1"/>Export</button></div>
                     <div className="overflow-x-auto">
-                      <table className="w-full text-sm text-left whitespace-nowrap">
-                        <thead className="bg-slate-50/80 border-b border-slate-100">
-                          <tr>
-                            <th className="px-5 py-3.5 font-semibold text-slate-600 uppercase text-xs">Area / สาขา</th>
-                            <th className="px-5 py-3.5 font-semibold text-slate-600 uppercase text-xs">ตำแหน่งงาน</th>
-                            <th className="px-5 py-3.5 font-semibold text-slate-600 uppercase text-xs text-center">SLA</th>
-                            <th className="px-5 py-3.5 font-semibold text-slate-600 uppercase text-xs text-center">ผู้สมัคร</th>
-                            <th className="px-5 py-3.5 font-semibold text-slate-600 uppercase text-xs">สถานะงาน</th>
-                            <th className="px-5 py-3.5 font-semibold text-slate-600 uppercase text-xs text-right">จัดการ</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {filteredVacancies.length === 0 ? (
-                            <tr><td colSpan="6" className="px-6 py-12 text-center text-slate-400">ยังไม่มีข้อมูลสำหรับ Area ที่เลือก</td></tr>
-                          ) : (
-                            filteredVacancies.map((v) => {
-                              
-                              // ถ้ารายการนี้อยู่ในโหมดการแก้ไข (Inline Edit)
-                              if (editVacId === v.id) {
-                                return (
-                                  <tr key={v.id} className="bg-blue-50/50 shadow-inner">
-                                    <td className="px-3 py-3">
-                                      <select value={editVacForm.branchCode} onChange={(e) => setEditVacForm({...editVacForm, branchCode: e.target.value})} className="w-full text-xs font-semibold border-slate-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm">
-                                        {availableBranchesForAreas.map(b => <option key={b.code} value={b.code}>[{b.area}] {b.name}</option>)}
-                                      </select>
-                                    </td>
-                                    <td className="px-3 py-3">
-                                      <select value={editVacForm.position} onChange={(e) => setEditVacForm({...editVacForm, position: e.target.value})} className="w-full text-xs font-semibold border-slate-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm">
-                                        {uniquePositionNames.map(pos => <option key={pos} value={pos}>{pos}</option>)}
-                                      </select>
-                                    </td>
-                                    <td className="px-3 py-3 text-center text-slate-400 text-xs">- ออโต้ -</td>
-                                    <td className="px-3 py-3 text-center text-slate-400 text-xs">- ออโต้ -</td>
-                                    <td className="px-3 py-3">
-                                      <select value={editVacForm.manualStatus} onChange={(e) => setEditVacForm({...editVacForm, manualStatus: e.target.value})} className="w-full text-xs font-semibold border-slate-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm">
-                                        {VACANCY_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                                      </select>
-                                    </td>
-                                    <td className="px-3 py-3 text-right whitespace-nowrap">
-                                      <button onClick={saveEditVac} className="inline-flex items-center justify-center bg-emerald-100 text-emerald-700 hover:bg-emerald-600 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors mr-2 shadow-sm"><Check size={14} className="mr-1"/>บันทึก</button>
-                                      <button onClick={() => setEditVacId(null)} className="inline-flex items-center justify-center bg-slate-200 text-slate-600 hover:bg-slate-300 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm"><X size={14} className="mr-1"/>ยกเลิก</button>
-                                    </td>
-                                  </tr>
-                                )
-                              }
-
-                              // โหมดแสดงผลปกติ
-                              const { applicantCount, computedStatus, slaDays, matchedApplicants } = getVacancyInsights(v);
-                              const isHiringAlert = computedStatus === 'Hiring' || computedStatus === 'รอเริ่มงาน';
-
-                              return (
-                                <tr key={v.id} className={`transition-colors ${isHiringAlert ? 'bg-emerald-50/40 hover:bg-emerald-50' : 'hover:bg-slate-50/50'}`}>
-                                  <td className="px-5 py-4">
-                                    <div className="text-xs font-bold text-blue-600 mb-0.5">{v.area}</div>
-                                    <div className="font-semibold text-slate-900">{v.branchName}</div>
-                                    <div className="text-xs text-slate-400">{v.branchCode}</div>
-                                  </td>
-                                  
-                                  {/* Click to Edit Vacancy */}
-                                  <td className="px-5 py-4 cursor-pointer group" onClick={() => startEditVac(v)} title="คลิกเพื่อแก้ไข">
-                                    <div className="text-slate-800 font-bold flex items-center gap-1.5 group-hover:text-blue-600 transition-colors">
-                                      {v.position} <Edit size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-blue-500" />
-                                    </div>
-                                  </td>
-                                  
-                                  <td className="px-5 py-4 text-center">
-                                    <div className={`inline-flex flex-col items-center justify-center min-w-[40px] ${slaDays > 30 ? 'text-red-500' : 'text-slate-600'}`}>
-                                      <span className="font-black text-base">{slaDays}</span>
-                                      <span className="text-[10px] font-semibold uppercase">วัน</span>
-                                    </div>
-                                  </td>
-
-                                  <td className="px-5 py-4 text-center">
-                                    <button 
-                                      onClick={() => setViewApplicants({ position: v.position, branchName: v.branchName, list: matchedApplicants })}
-                                      disabled={applicantCount === 0}
-                                      className={`inline-flex items-center justify-center min-w-[36px] h-9 rounded-xl font-bold text-sm border transition-all ${
-                                        applicantCount > 0 
-                                          ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-600 hover:text-white hover:shadow-md cursor-pointer' 
-                                          : 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed'
-                                      }`}
-                                    >
-                                      {applicantCount}
-                                    </button>
-                                  </td>
-
-                                  <td className="px-5 py-4">
-                                    <div className="flex flex-col items-start gap-1">
-                                      <div className="flex items-center space-x-2">
-                                        <div className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold"
-                                          style={{ backgroundColor: `${VACANCY_COLORS[computedStatus] || '#475569'}15`, color: VACANCY_COLORS[computedStatus] || '#475569', border: `1px solid ${VACANCY_COLORS[computedStatus] || '#475569'}30` }}
-                                        >
-                                          <span className="w-1.5 h-1.5 rounded-full mr-1.5" style={{ backgroundColor: VACANCY_COLORS[computedStatus] || '#475569' }}></span>
-                                          {computedStatus}
-                                        </div>
-                                        {isHiringAlert && <BellRing className="w-4 h-4 text-red-500 animate-bounce" />}
-                                      </div>
-                                    </div>
-                                  </td>
-
-                                  <td className="px-5 py-4">
-                                    <div className="flex items-center justify-end space-x-2">
-                                      {isHiringAlert && (
-                                        <button onClick={() => closeVacancy(v.id)} className="flex items-center space-x-1 text-xs bg-red-50 text-red-600 px-2.5 py-1.5 rounded-lg border border-red-200 hover:bg-red-500 hover:text-white transition-colors shadow-sm font-semibold">
-                                          <CheckCircle2 size={14} /><span>ปิดงาน</span>
-                                        </button>
-                                      )}
-                                      <button onClick={() => startEditVac(v)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="แก้ไขข้อมูล">
-                                        <Edit size={16} />
-                                      </button>
-                                      <button onClick={() => deleteVacancy(v.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="ลบ">
-                                        <Trash2 size={16} />
-                                      </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              );
-                            })
-                          )}
-                        </tbody>
-                      </table>
+                      <table className="w-full text-sm text-left whitespace-nowrap"><thead className="bg-slate-50 border-b"><tr><th className="px-5 py-3">Area / สาขา</th><th className="px-5 py-3">ตำแหน่งงาน</th><th className="px-5 py-3 text-center">SLA</th><th className="px-5 py-3 text-center">ผู้สมัคร</th><th className="px-5 py-3">สถานะงาน</th><th className="px-5 py-3 text-right">จัดการ</th></tr></thead>
+                      <tbody>
+                        {filteredVacancies.map((v) => {
+                          if (editVacId === v.id) {
+                            return (
+                              <tr key={v.id} className="bg-blue-50"><td className="p-3"><select value={editVacForm.branchCode} onChange={e=>setEditVacForm({...editVacForm, branchCode:e.target.value})} className="w-full border p-1.5 rounded">{availableBranchesForAreas.map(b=><option key={b.code} value={b.code}>{b.name}</option>)}</select></td><td className="p-3"><select value={editVacForm.position} onChange={e=>setEditVacForm({...editVacForm, position:e.target.value})} className="w-full border p-1.5 rounded">{uniquePositionNames.map(pos=><option key={pos} value={pos}>{pos}</option>)}</select></td><td className="p-3 text-center">-</td><td className="p-3 text-center">-</td><td className="p-3"><select value={editVacForm.manualStatus} onChange={e=>setEditVacForm({...editVacForm, manualStatus:e.target.value})} className="w-full border p-1.5 rounded">{VACANCY_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}</select></td><td className="p-3 text-right"><button onClick={saveEditVac} className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs mr-2">บันทึก</button><button onClick={()=>setEditVacId(null)} className="bg-slate-200 text-slate-700 px-2 py-1 rounded text-xs">ยกเลิก</button></td></tr>
+                            )
+                          }
+                          const { applicantCount, computedStatus, slaDays, matchedApplicants } = getVacancyInsights(v);
+                          return (
+                            <tr key={v.id} className="hover:bg-slate-50 border-b">
+                              <td className="px-5 py-4"><div className="text-xs text-blue-600 font-bold">{v.area}</div><div className="font-semibold">{v.branchName}</div></td>
+                              <td className="px-5 py-4 font-bold cursor-pointer hover:text-blue-600 group" onClick={()=>startEditVac(v)}>{v.position} <Edit size={12} className="inline opacity-0 group-hover:opacity-100"/></td>
+                              <td className="px-5 py-4 text-center font-black text-lg {slaDays > 30 ? 'text-red-500' : ''}">{slaDays}<span className="text-[10px] block">วัน</span></td>
+                              <td className="px-5 py-4 text-center"><button onClick={()=>setViewApplicants({position:v.position, branchName:v.branchName, list:matchedApplicants})} disabled={applicantCount===0} className={`w-8 h-8 rounded-lg font-bold border ${applicantCount>0?'bg-blue-50 text-blue-700':'bg-slate-50 text-slate-400'}`}>{applicantCount}</button></td>
+                              <td className="px-5 py-4"><span className="px-2.5 py-1 rounded-full text-xs font-bold" style={{backgroundColor:VACANCY_COLORS[computedStatus]+'15', color:VACANCY_COLORS[computedStatus]}}>{computedStatus}</span></td>
+                              <td className="px-5 py-4 text-right space-x-2">
+                                <button onClick={()=>startEditVac(v)} className="p-1.5 text-slate-400 hover:text-blue-600"><Edit size={16}/></button>
+                                <button onClick={()=>deleteVacancy(v.id)} className="p-1.5 text-slate-400 hover:text-red-600"><Trash2 size={16}/></button>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody></table>
                     </div>
                   </div>
                 )}
               </div>
             )}
 
-            {/* --- TAB: RECRUIT ENTRY --- */}
             {activeTab === 'entry' && (
-              <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-                
-                {/* 1. TA Selection */}
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8">
-                  <div className="mb-6">
-                    <h2 className="text-lg font-bold text-slate-900 flex items-center space-x-2"><UserPlus className="text-blue-600" size={22} /><span>ส่วนงานรับผิดชอบ (Recruiter)</span></h2>
-                    <p className="text-sm text-slate-500 mt-1 ml-7">กรุณาระบุชื่อ TA ของคุณ เพื่อเรียกดูและเพิ่มผู้สมัครเข้าสู่ตำแหน่งงานที่กำลังเปิดรับ</p>
-                  </div>
-                  <div className="max-w-md ml-0 md:ml-7">
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">ชื่อผู้รับผิดชอบ (TA) <span className="text-red-500">*</span></label>
-                    <select value={selectedTA} onChange={(e) => setSelectedTA(e.target.value)} className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none shadow-sm">
-                      <option value="">-- ระบุ TA --</option>
-                      {appTAs.map(ta => <option key={ta} value={ta}>{ta}</option>)}
-                    </select>
-                  </div>
+              <div className="space-y-6">
+                <div className="bg-white rounded-2xl shadow-sm border p-6">
+                  <h2 className="text-lg font-bold flex items-center mb-4"><UserPlus className="text-blue-600 mr-2"/> เลือก TA (Recruiter)</h2>
+                  <select value={selectedTA} onChange={e=>setSelectedTA(e.target.value)} className="w-full md:w-1/2 border rounded-xl px-4 py-3 outline-none focus:border-blue-500"><option value="">-- ระบุ TA --</option>{appTAs.map(ta=><option key={ta} value={ta}>{ta}</option>)}</select>
                 </div>
-
+                
                 {selectedTA && (
                   <>
-                    {/* 2. Vacancies List for Recruiter */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                      <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/50">
-                        <div>
-                          <h3 className="font-bold text-slate-900 text-lg flex items-center space-x-2">
-                            <Target className="text-blue-600" size={20} />
-                            <span>ตำแหน่งงานที่กำลังเปิดรับ (Active Vacancies)</span>
-                          </h3>
-                          <p className="text-sm text-slate-500 mt-1 ml-7">ระบบกรองเฉพาะตำแหน่งที่คุณดูแล หรือตำแหน่งกองกลาง</p>
-                        </div>
-                        
-                        {/* Filters for Recruit Table */}
-                        <div className="flex items-center space-x-3 w-full md:w-auto">
-                          <select value={recruitAreaFilter} onChange={(e) => { setRecruitAreaFilter(e.target.value); setRecruitBranchFilter(''); }} className="w-full md:w-32 bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
-                            <option value="">ทุก Area</option>
-                            {appAreas.map(area => <option key={area} value={area}>{area}</option>)}
-                          </select>
-                          <select value={recruitBranchFilter} onChange={(e) => setRecruitBranchFilter(e.target.value)} className="w-full md:w-48 bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500" disabled={!recruitAreaFilter}>
-                            <option value="">ทุกสาขา</option>
-                            {branchesForRecruitFilter.map(b => <option key={b.code} value={b.code}>{b.name}</option>)}
-                          </select>
-                        </div>
+                    <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
+                      <div className="p-6 border-b flex flex-wrap gap-4 justify-between items-center bg-slate-50/50">
+                        <h3 className="font-bold text-lg">ตำแหน่งงานที่เปิดรับ (กรองตาม TA อัตโนมัติ)</h3>
+                        <div className="flex space-x-2"><select value={recruitAreaFilter} onChange={e=>{setRecruitAreaFilter(e.target.value);setRecruitBranchFilter('')}} className="border rounded-lg px-2 py-1.5 text-sm"><option value="">ทุก Area</option>{appAreas.map(a=><option key={a}>{a}</option>)}</select><select value={recruitBranchFilter} onChange={e=>setRecruitBranchFilter(e.target.value)} disabled={!recruitAreaFilter} className="border rounded-lg px-2 py-1.5 text-sm"><option value="">ทุกสาขา</option>{branchesForRecruitFilter.map(b=><option key={b.code} value={b.code}>{b.name}</option>)}</select></div>
                       </div>
-
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left whitespace-nowrap">
-                          <thead className="bg-white border-b border-slate-100">
-                            <tr>
-                              <th className="px-6 py-3.5 font-semibold text-slate-600 uppercase text-xs">Area / สาขา</th>
-                              <th className="px-6 py-3.5 font-semibold text-slate-600 uppercase text-xs">ตำแหน่งที่เปิดรับ</th>
-                              <th className="px-6 py-3.5 font-semibold text-slate-600 uppercase text-xs text-center">ยอดรับสมัครแล้ว</th>
-                              <th className="px-6 py-3.5 font-semibold text-slate-600 uppercase text-xs text-center">สถานะตำแหน่ง</th>
-                              <th className="px-6 py-3.5 font-semibold text-slate-600 uppercase text-xs text-right">ดำเนินการ</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-50">
-                            {activeVacanciesForRecruit.length === 0 ? (
-                              <tr><td colSpan="5" className="px-6 py-12 text-center text-slate-400">ไม่มีตำแหน่งงานว่างที่ตรงกับคุณ หรือยังไม่มีการเปิดรับตำแหน่งจาก Area HR</td></tr>
-                            ) : (
-                              activeVacanciesForRecruit.map(v => {
-                                const { applicantCount, computedStatus } = getVacancyInsights(v);
-                                return (
-                                  <tr key={v.id} className="hover:bg-blue-50/30 transition-colors group">
-                                    <td className="px-6 py-4">
-                                      <div className="text-xs font-bold text-blue-600 mb-0.5">{v.area}</div>
-                                      <div className="font-semibold text-slate-900">{v.branchName}</div>
-                                    </td>
-                                    <td className="px-6 py-4 font-bold text-slate-800">{v.position}</td>
-                                    <td className="px-6 py-4 text-center">
-                                      <span className={`inline-flex items-center justify-center min-w-[32px] h-8 rounded-lg font-bold text-sm border ${applicantCount > 0 ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
-                                        {applicantCount}
-                                      </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-center">
-                                      <div className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: `${VACANCY_COLORS[computedStatus] || '#475569'}15`, color: VACANCY_COLORS[computedStatus] || '#475569', border: `1px solid ${VACANCY_COLORS[computedStatus] || '#475569'}30` }}>
-                                        {computedStatus}
-                                      </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                      <button 
-                                        onClick={() => setAddingApplicantFor(v)}
-                                        className="inline-flex items-center space-x-1.5 bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-xl text-sm font-semibold transition-colors shadow-sm"
-                                      >
-                                        <PlusCircle size={16} />
-                                        <span>เพิ่มผู้สมัคร</span>
-                                      </button>
-                                    </td>
-                                  </tr>
-                                );
-                              })
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
+                      <div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead className="bg-white border-b"><tr><th className="p-4">สาขา</th><th className="p-4">ตำแหน่ง</th><th className="p-4 text-center">รับแล้ว</th><th className="p-4">สถานะ</th><th className="p-4 text-right">ดำเนินการ</th></tr></thead>
+                        <tbody>{activeVacanciesForRecruit.map(v => {
+                          const { applicantCount, computedStatus } = getVacancyInsights(v);
+                          return <tr key={v.id} className="border-b hover:bg-slate-50"><td className="p-4"><div className="text-xs font-bold text-blue-600">{v.area}</div><div className="font-semibold">{v.branchName}</div></td><td className="p-4 font-bold">{v.position}</td><td className="p-4 text-center"><span className="px-2 py-1 border rounded bg-slate-50">{applicantCount}</span></td><td className="p-4"><span className="px-2 py-1 rounded-full text-xs font-bold" style={{color:VACANCY_COLORS[computedStatus]}}>{computedStatus}</span></td><td className="p-4 text-right"><button onClick={()=>setAddingApplicantFor(v)} className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold">เพิ่มผู้สมัคร</button></td></tr>
+                        })}</tbody>
+                      </table></div>
                     </div>
 
-                    {/* 3. My Applicant History */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 mt-8">
-                      <div className="px-6 py-5 border-b flex justify-between items-center flex-wrap gap-4">
-                        <div>
-                          <h3 className="font-bold text-slate-900 text-lg">ประวัติการบันทึกผู้สมัครล่าสุดของคุณ</h3>
-                          <p className="text-sm text-slate-500 mt-0.5">คลิกที่ <span className="font-semibold text-blue-600">ชื่อผู้สมัคร</span> หรือปรับสถานะผ่าน <span className="font-semibold text-blue-600">Dropdown</span> ได้เลย</p>
-                        </div>
-                        <button onClick={() => exportToExcel(myApplicants, 'My_Applicants_Export')} className="flex items-center space-x-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white border border-emerald-200 text-xs font-bold px-3 py-2 rounded-lg transition-colors shadow-sm">
-                          <Download size={14} /><span>Export Excel</span>
-                        </button>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left whitespace-nowrap">
-                          <thead className="bg-slate-50">
-                            <tr>
-                              <th className="px-6 py-3">สาขา</th>
-                              <th className="px-6 py-3">ชื่อ-นามสกุล / ตำแหน่ง</th>
-                              <th className="px-6 py-3">สถานะ (คลิกเพื่อเปลี่ยน)</th>
-                              <th className="px-6 py-3">ไฟล์แนบ</th>
-                              <th className="px-6 py-3 text-right">จัดการ</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {myApplicants.length === 0 ? (
-                              <tr><td colSpan="5" className="px-6 py-8 text-center text-slate-400">คุณยังไม่มีประวัติการเพิ่มผู้สมัคร</td></tr>
-                            ) : (
-                              myApplicants.map(app => {
-                                // โหมดแก้ไข Inline สำหรับข้อมูลผู้สมัคร
-                                if (editAppId === app.id) {
-                                  return (
-                                    <tr key={app.id} className="bg-blue-50/50 shadow-inner">
-                                      <td className="px-3 py-3">
-                                        <div className="font-semibold text-slate-800 text-xs">{app.branchName}</div>
-                                        <div className="text-[10px] text-slate-400">{app.branchCode}</div>
-                                      </td>
-                                      <td className="px-3 py-3 space-y-1.5">
-                                        <input value={editAppForm.name} onChange={e => setEditAppForm({...editAppForm, name: e.target.value})} className="w-full text-xs font-semibold border-slate-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm" placeholder="ชื่อ-นามสกุล" />
-                                        <input value={editAppForm.phone} onChange={e => setEditAppForm({...editAppForm, phone: e.target.value})} className="w-full text-xs font-semibold border-slate-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm" placeholder="เบอร์ติดต่อ" />
-                                      </td>
-                                      <td className="px-3 py-3 space-y-1.5">
-                                        <select value={editAppForm.status} onChange={e => setEditAppForm({...editAppForm, status: e.target.value})} className="w-full text-xs font-semibold border-slate-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm">
-                                          {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                                        </select>
-                                        
-                                        {/* เงื่อนไขแสดงช่องกรอกวันที่เริ่มงาน */}
-                                        {editAppForm.status === 'รอเริ่มงาน' && (
-                                          <input type="date" value={editAppForm.startDate || ''} onChange={e => setEditAppForm({...editAppForm, startDate: e.target.value})} className="w-full text-xs font-semibold border-sky-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 shadow-sm mt-1" />
-                                        )}
-
-                                        {['อื่นๆ', 'ไม่ผ่าน', 'ไม่มาเริ่มงาน'].includes(editAppForm.status) && (
-                                          <input value={editAppForm.comment || ''} onChange={e => setEditAppForm({...editAppForm, comment: e.target.value})} className="w-full text-xs font-semibold border-orange-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 shadow-sm mt-1" placeholder="ระบุเหตุผล..." />
-                                        )}
-                                      </td>
-                                      <td className="px-3 py-3">
-                                        {editAppForm.resumeName ? <span className="text-xs text-slate-500 truncate max-w-[100px] block">{editAppForm.resumeName}</span> : <span className="text-xs text-slate-400">-</span>}
-                                      </td>
-                                      <td className="px-3 py-3 text-right whitespace-nowrap">
-                                        <button onClick={saveEditApp} className="inline-flex items-center justify-center bg-emerald-100 text-emerald-700 hover:bg-emerald-600 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors mr-2 shadow-sm"><Check size={14} className="mr-1"/>บันทึก</button>
-                                        <button onClick={() => setEditAppId(null)} className="inline-flex items-center justify-center bg-slate-200 text-slate-600 hover:bg-slate-300 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm"><X size={14} className="mr-1"/>ยกเลิก</button>
-                                      </td>
-                                    </tr>
-                                  );
-                                }
-
-                                // โหมดแสดงผลปกติ
-                                return (
-                                  <tr key={app.id} className="border-t hover:bg-slate-50">
-                                    <td className="px-6 py-4">
-                                      <div className="font-semibold text-slate-800">{app.branchName}</div>
-                                      <div className="text-xs text-slate-400">{app.branchCode}</div>
-                                    </td>
-                                    
-                                    {/* Click to Edit Applicant */}
-                                    <td className="px-6 py-4 cursor-pointer group" onClick={() => startEditApp(app)} title="คลิกเพื่อแก้ไข">
-                                      <div className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors flex items-center gap-1.5">
-                                        {app.name} <Edit size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-blue-500" />
-                                      </div>
-                                      <div className="text-sm text-slate-600 mt-0.5">{app.position} • {app.phone}</div>
-                                    </td>
-
-                                    {/* Inline Status Dropdown */}
-                                    <td className="px-6 py-4">
-                                      <select
-                                        value={app.status}
-                                        onChange={(e) => handleInlineStatusChange(app, e.target.value)}
-                                        className="status-select font-bold text-xs px-3 py-1.5 rounded-full outline-none cursor-pointer border transition-all hover:shadow-sm"
-                                        style={{
-                                          backgroundColor: `${STATUS_COLORS[app.status]}15`,
-                                          color: STATUS_COLORS[app.status],
-                                          borderColor: `${STATUS_COLORS[app.status]}30`
-                                        }}
-                                      >
-                                        {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                                      </select>
-                                      {app.comment && <div className="text-xs text-slate-500 mt-1.5 max-w-[200px] truncate" title={app.comment}>เหตุผล: {app.comment}</div>}
-                                      {app.status === 'รอเริ่มงาน' && app.startDate && <div className="text-xs text-sky-600 mt-1.5 font-semibold" title="วันเริ่มงาน">📅 เริ่มงาน: {new Date(app.startDate).toLocaleDateString('th-TH')}</div>}
-                                      {app.status === 'มาเริ่มงาน' && app.startDate && <div className="text-[10px] text-emerald-600 mt-1 font-semibold">เริ่มงานแล้วเมื่อ: {new Date(app.startDate).toLocaleDateString('th-TH')}</div>}
-                                    </td>
-
-                                    <td className="px-6 py-4">
-                                      {app.resumeBase64 ? (
-                                        <div className="flex items-center space-x-2">
-                                          <button onClick={() => setPreviewFile({ base64: app.resumeBase64, name: app.resumeName })} className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1.5 rounded-md border border-blue-200 flex items-center hover:bg-blue-600 hover:text-white transition-colors shadow-sm cursor-pointer" title="ดูตัวอย่าง">
-                                            <Eye size={12} className="mr-1.5"/> Preview
-                                          </button>
-                                        </div>
-                                      ) : app.resumeName ? (
-                                        <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md border flex w-fit items-center"><Paperclip size={12} className="mr-1"/> มีไฟล์</span>
-                                      ) : (
-                                        <span className="text-xs text-slate-400">-</span>
-                                      )}
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                      <div className="flex items-center justify-end space-x-2">
-                                        <button onClick={() => startEditApp(app)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="แก้ไข">
-                                          <Edit size={16} />
-                                        </button>
-                                        <button onClick={() => deleteApplicant(app.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="ลบข้อมูล">
-                                          <Trash2 size={16} />
-                                        </button>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                )
-                              })
-                            )}
-                        </tbody></table>
-                      </div>
+                    <div className="bg-white rounded-2xl shadow-sm border mt-6">
+                      <div className="p-5 border-b flex justify-between items-center"><h3 className="font-bold">ประวัติของคุณ</h3><button onClick={()=>exportToExcel(myApplicants, 'MyApps')} className="text-xs border px-2 py-1 rounded bg-slate-50">Export</button></div>
+                      <div className="overflow-x-auto"><table className="w-full text-sm text-left"><tbody>
+                        {myApplicants.map(app => {
+                          if (editAppId === app.id) return (
+                            <tr key={app.id} className="bg-blue-50/50"><td className="p-3 font-semibold text-xs">{app.branchName}</td><td className="p-3 space-y-1"><input value={editAppForm.name} onChange={e=>setEditAppForm({...editAppForm, name:e.target.value})} className="w-full border p-1 text-xs"/><input value={editAppForm.phone} onChange={e=>setEditAppForm({...editAppForm, phone:e.target.value})} className="w-full border p-1 text-xs"/></td><td className="p-3 space-y-1"><select value={editAppForm.status} onChange={e=>setEditAppForm({...editAppForm, status:e.target.value})} className="w-full border p-1 text-xs">{STATUSES.map(s=><option key={s}>{s}</option>)}</select>{editAppForm.status==='รอเริ่มงาน'&&<input type="date" value={editAppForm.startDate||''} onChange={e=>setEditAppForm({...editAppForm, startDate:e.target.value})} className="w-full border p-1 text-xs"/>}{['อื่นๆ','ไม่ผ่าน','ไม่มาเริ่มงาน'].includes(editAppForm.status)&&<input placeholder="เหตุผล" value={editAppForm.comment||''} onChange={e=>setEditAppForm({...editAppForm, comment:e.target.value})} className="w-full border p-1 text-xs"/>}</td><td className="p-3 text-right"><button onClick={saveEditApp} className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs mr-2">บันทึก</button><button onClick={()=>setEditAppId(null)} className="bg-slate-200 px-2 py-1 rounded text-xs">ยกเลิก</button></td></tr>
+                          )
+                          return (
+                            <tr key={app.id} className="border-t hover:bg-slate-50"><td className="p-4"><div className="font-semibold">{app.branchName}</div></td><td className="p-4 cursor-pointer group" onClick={()=>startEditApp(app)}><div className="font-bold group-hover:text-blue-600">{app.name} <Edit size={12} className="inline opacity-0 group-hover:opacity-100"/></div><div className="text-xs text-slate-500">{app.position} • {app.phone}</div></td><td className="p-4"><select value={app.status} onChange={e=>handleInlineStatusChange(app, e.target.value)} className="status-select font-bold text-xs px-2 py-1 rounded-full outline-none border" style={{color:STATUS_COLORS[app.status], borderColor:STATUS_COLORS[app.status]}}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select>{app.status==='รอเริ่มงาน'&&app.startDate&&<div className="text-[10px] text-sky-600 mt-1">เริ่ม: {new Date(app.startDate).toLocaleDateString('th')}</div>}</td><td className="p-4 text-right space-x-2"><button onClick={()=>startEditApp(app)} className="text-slate-400 hover:text-blue-600"><Edit size={16}/></button><button onClick={()=>deleteApplicant(app.id)} className="text-slate-400 hover:text-red-600"><Trash2 size={16}/></button></td></tr>
+                          )
+                        })}
+                      </tbody></table></div>
                     </div>
                   </>
                 )}
 
-                {/* Modal: เพิ่มข้อมูลผู้สมัคร สำหรับตำแหน่งที่เลือก */}
                 {addingApplicantFor && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden">
-                      <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-blue-600 text-white">
-                        <div>
-                          <h3 className="font-bold text-lg flex items-center space-x-2">
-                            <UserPlus size={20} /><span>เพิ่มข้อมูลผู้สมัครใหม่</span>
-                          </h3>
-                          <p className="text-blue-100 text-sm mt-1">ตำแหน่ง: {addingApplicantFor.position} • {addingApplicantFor.branchName}</p>
-                        </div>
-                        <button onClick={() => setAddingApplicantFor(null)} className="p-2 text-blue-200 hover:bg-blue-500 hover:text-white rounded-full transition-colors"><X size={20} /></button>
-                      </div>
-                      <form onSubmit={handleRecruitSubmit} className="p-6 md:p-8 space-y-6 max-h-[70vh] overflow-y-auto">
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                          <div><label className="text-sm font-semibold mb-2 block">ชื่อ-นามสกุล <span className="text-red-500">*</span></label><input required type="text" name="name" value={formData.name} onChange={handleInputChange} className="w-full border border-slate-300 rounded-xl px-4 py-2.5 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"/></div>
-                          <div><label className="text-sm font-semibold mb-2 block">เบอร์ติดต่อ <span className="text-red-500">*</span></label><input required type="tel" name="phone" value={formData.phone} onChange={handleInputChange} className="w-full border border-slate-300 rounded-xl px-4 py-2.5 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"/></div>
-                          <div className="md:col-span-2">
-                            <label className="text-sm font-semibold mb-2 block">สถานะผู้สมัคร <span className="text-red-500">*</span></label>
-                            <select required name="status" value={formData.status} onChange={handleInputChange} className="w-full border border-slate-300 rounded-xl px-4 py-2.5 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10">
-                              <option value="">-- เลือกสถานะปัจจุบัน --</option>
-                              {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                            </select>
-                          </div>
-                          
-                          {/* วันเริ่มงาน จะโชว์เมื่อเลือกสถานะรอเริ่มงาน */}
-                          {formData.status === 'รอเริ่มงาน' && (
-                            <div className="md:col-span-2 bg-sky-50/50 p-5 rounded-xl border border-sky-100 animate-in fade-in duration-300">
-                              <label className="text-sm font-semibold text-sky-800 mb-2 block">ระบุวันที่เริ่มงาน <span className="text-red-500">*</span></label>
-                              <input required type="date" name="startDate" value={formData.startDate || ''} onChange={handleInputChange} className="w-full border border-sky-200 rounded-xl px-4 py-3 outline-none focus:border-sky-400 focus:ring-4 focus:ring-sky-500/10" />
-                            </div>
-                          )}
-
-                        </div>
-
-                        {/* UPLOAD RESUME */}
-                        <div>
-                          <label className="text-sm font-semibold mb-2 block">อัปโหลดเรซูเม่ (ไม่บังคับ)</label>
-                          <div className="flex items-center space-x-2">
-                             <label className="flex items-center justify-center w-full bg-white border border-slate-300 border-dashed rounded-xl px-4 py-4 hover:bg-slate-50 hover:border-blue-400 cursor-pointer transition-colors shadow-sm">
-                                <Upload size={18} className="text-blue-500 mr-2" />
-                                <span className="text-sm text-slate-600 font-medium">{formData.resumeName || 'คลิกเพื่อเลือกไฟล์ (PDF, DOC, รูปภาพ)'}</span>
-                                <input type="file" className="hidden" accept=".pdf,.doc,.docx,image/*" onChange={handleFileUpload} />
-                             </label>
-                             {formData.resumeName && (
-                               <button type="button" onClick={() => setFormData(prev => ({...prev, resumeName:'', resumeBase64:''}))} className="p-4 rounded-xl bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
-                                 <X size={20}/>
-                               </button>
-                             )}
-                          </div>
-                        </div>
-
-                        {['อื่นๆ', 'ไม่ผ่าน', 'ไม่มาเริ่มงาน'].includes(formData.status) && (
-                          <div className="bg-orange-50/50 p-5 rounded-xl border border-orange-100 animate-in fade-in duration-300">
-                            <label className="text-sm font-semibold text-orange-800 mb-2 block">ระบุเหตุผล / รายละเอียด <span className="text-red-500">*</span></label>
-                            <textarea required name="comment" value={formData.comment} onChange={handleInputChange} rows="2" className="w-full border border-orange-200 rounded-xl px-4 py-3 outline-none focus:border-orange-400 focus:ring-4 focus:ring-orange-500/10"></textarea>
-                          </div>
-                        )}
-                        
-                        <div className="pt-6 border-t flex justify-end space-x-3">
-                          <button type="button" onClick={() => setAddingApplicantFor(null)} className="px-6 py-3 rounded-xl font-semibold text-slate-600 hover:bg-slate-100 transition-colors">ยกเลิก</button>
-                          <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white py-3 px-8 rounded-xl font-semibold shadow-sm flex items-center space-x-2 transition-all active:scale-95">
-                            <CheckCircle2 size={18} /><span>บันทึกข้อมูล</span>
-                          </button>
-                        </div>
+                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
+                      <div className="px-6 py-4 border-b bg-blue-600 text-white flex justify-between items-center"><h3 className="font-bold">เพิ่มผู้สมัคร: {addingApplicantFor.position}</h3><button onClick={()=>setAddingApplicantFor(null)}><X size={20}/></button></div>
+                      <form onSubmit={handleRecruitSubmit} className="p-6 space-y-4">
+                        <input required placeholder="ชื่อ-นามสกุล" value={formData.name} onChange={handleInputChange} name="name" className="w-full border rounded-xl p-3 outline-none focus:border-blue-500"/>
+                        <input required type="tel" placeholder="เบอร์โทร" value={formData.phone} onChange={handleInputChange} name="phone" className="w-full border rounded-xl p-3 outline-none focus:border-blue-500"/>
+                        <select required name="status" value={formData.status} onChange={handleInputChange} className="w-full border rounded-xl p-3 outline-none focus:border-blue-500"><option value="">-- สถานะปัจจุบัน --</option>{STATUSES.map(s=><option key={s}>{s}</option>)}</select>
+                        {formData.status === 'รอเริ่มงาน' && <input required type="date" name="startDate" value={formData.startDate||''} onChange={handleInputChange} className="w-full border border-sky-300 rounded-xl p-3"/>}
+                        {['อื่นๆ','ไม่ผ่าน','ไม่มาเริ่มงาน'].includes(formData.status) && <textarea required name="comment" value={formData.comment} onChange={handleInputChange} placeholder="ระบุเหตุผล" className="w-full border border-orange-300 rounded-xl p-3"></textarea>}
+                        <div className="flex items-center space-x-2 border p-3 rounded-xl"><Upload size={16}/><input type="file" onChange={handleFileUpload} className="text-sm w-full"/></div>
+                        <div className="pt-4 flex justify-end"><button type="submit" className="bg-blue-600 text-white font-bold px-6 py-2.5 rounded-xl shadow-md">บันทึกข้อมูล</button></div>
                       </form>
                     </div>
                   </div>
@@ -1330,308 +651,68 @@
               </div>
             )}
 
-            {/* --- TAB: DASHBOARD --- */}
             {activeTab === 'dashboard' && (
-               <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500 pb-10">
-                 <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-8 rounded-3xl shadow-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative overflow-hidden">
-                   <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-white opacity-5 rounded-full blur-2xl"></div>
-                   <div className="relative z-10">
-                     <div className="inline-flex items-center space-x-2 bg-white/10 px-3 py-1 rounded-full text-blue-200 text-xs font-semibold mb-3 border border-white/10">
-                       <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
-                       <span>Executive Dashboard</span>
-                     </div>
-                     <h2 className="text-2xl md:text-3xl font-black text-white">รายงานสรุปผลสำหรับผู้บริหาร</h2>
-                     <p className="text-slate-300 mt-1">ภาพรวมการสรรหาบุคลากรและประสิทธิภาพของกระบวนการ</p>
+              <div className="space-y-6">
+                <div className="bg-slate-900 p-8 rounded-3xl text-white flex justify-between items-center">
+                  <div><h2 className="text-2xl font-black">Executive Dashboard</h2></div>
+                  <select value={dashboardTA} onChange={e=>setDashboardTA(e.target.value)} className="bg-white/10 p-2 rounded-xl text-white outline-none"><option value="ALL">All TAs</option>{appTAs.map(t=><option key={t}>{t}</option>)}</select>
+                </div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                   <div className="bg-white p-5 rounded-2xl border shadow-sm"><div className="text-sm text-slate-500 font-bold mb-2">รวมผู้สมัคร</div><div className="text-3xl font-black">{dashboardData.length}</div></div>
+                   <div className="bg-white p-5 rounded-2xl border shadow-sm"><div className="text-sm text-emerald-600 font-bold mb-2">สำเร็จ (Hired)</div><div className="text-3xl font-black">{dashboardData.filter(a=>['มาเริ่มงาน','ผ่าน'].includes(a.status)).length}</div></div>
+                   <div className="bg-white p-5 rounded-2xl border shadow-sm"><div className="text-sm text-amber-600 font-bold mb-2">รอดำเนินการ</div><div className="text-3xl font-black">{dashboardData.filter(a=>['รอสัมภาษณ์','รอเริ่มงาน','ตรวจสุขภาพ'].includes(a.status)).length}</div></div>
+                   <div className="bg-white p-5 rounded-2xl border shadow-sm"><div className="text-sm text-red-600 font-bold mb-2">ไม่ผ่าน/ปฏิเสธ</div><div className="text-3xl font-black">{dashboardData.filter(a=>['ไม่ผ่าน','ไม่มาเริ่มงาน'].includes(a.status)).length}</div></div>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                   <div className="bg-white p-6 rounded-3xl border shadow-sm h-[350px]">
+                      <h3 className="font-bold mb-4">แหล่งที่มาแยกตามสาขา</h3>
+                      <ResponsiveContainer width="100%" height="100%"><BarChart data={branchChartData}><XAxis dataKey="name" tick={{fontSize:10}}/><Bar dataKey="count" fill="#3B82F6" radius={[4,4,0,0]}/><RechartsTooltip/></BarChart></ResponsiveContainer>
                    </div>
-                   <div className="relative z-10 w-full md:w-auto">
-                     <label className="block text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider">วิเคราะห์ข้อมูลตาม TA</label>
-                     <div className="flex items-center space-x-3 bg-white/10 backdrop-blur-md p-1.5 rounded-2xl border border-white/20">
-                       <Search size={18} className="text-slate-300 ml-3" />
-                       <select value={dashboardTA} onChange={(e) => setDashboardTA(e.target.value)} className="w-full md:w-56 bg-transparent text-white py-2.5 pr-8 focus:outline-none [&>option]:text-slate-900 font-semibold cursor-pointer">
-                         <option value="ALL">สรุปรวมทั้งหมด (All TAs)</option>
-                         {appTAs.map(ta => <option key={ta} value={ta}>{ta}</option>)}
-                       </select>
-                     </div>
+                   <div className="bg-white p-6 rounded-3xl border shadow-sm h-[350px]">
+                      <h3 className="font-bold mb-4">สถานะผู้สมัคร</h3>
+                      <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={statusChartData} innerRadius={60} outerRadius={90} dataKey="value">{statusChartData.map((e,i)=><Cell key={i} fill={STATUS_COLORS[e.name]||'#ccc'}/>)}</Pie><Legend/><RechartsTooltip/></PieChart></ResponsiveContainer>
                    </div>
-                 </div>
-     
-                 {/* Executive KPIs */}
-                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                   <div className="bg-white p-7 rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:-translate-y-1 transition-transform">
-                     <div className="flex justify-between items-start mb-4">
-                       <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl"><Users size={24} /></div>
-                       <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-md">Total</span>
-                     </div>
-                     <p className="text-sm font-bold text-slate-500 mb-1">รวมผู้สมัครทั้งหมด</p>
-                     <p className="text-4xl font-black text-slate-900">{dashboardData.length} <span className="text-sm font-semibold text-slate-400">คน</span></p>
+                   <div className="bg-white p-6 rounded-3xl border shadow-sm lg:col-span-2 h-[350px]">
+                      <h3 className="font-bold mb-4">Vacancy SLA Aging (อายุงานว่าง)</h3>
+                      <ResponsiveContainer width="100%" height="100%"><BarChart data={slaChartData}><XAxis dataKey="name"/><Bar dataKey="count" fill="#10B981" radius={[4,4,0,0]}>{slaChartData.map((e,i)=><Cell key={i} fill={e.fill}/>)}</Bar><RechartsTooltip/></BarChart></ResponsiveContainer>
                    </div>
-     
-                   <div className="bg-white p-7 rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:-translate-y-1 transition-transform">
-                     <div className="flex justify-between items-start mb-4">
-                       <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl"><CheckCircle2 size={24} /></div>
-                       <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
-                         {dashboardData.length > 0 ? Math.round((dashboardData.filter(a=>['มาเริ่มงาน','ผ่าน'].includes(a.status)).length / dashboardData.length) * 100) : 0}% Yield
-                       </span>
-                     </div>
-                     <p className="text-sm font-bold text-slate-500 mb-1">สำเร็จ (เริ่มงาน/ผ่าน)</p>
-                     <div className="flex items-baseline space-x-2">
-                       <p className="text-4xl font-black text-slate-900">{dashboardData.filter(a=>['มาเริ่มงาน','ผ่าน'].includes(a.status)).length}</p>
-                     </div>
-                   </div>
-     
-                   <div className="bg-white p-7 rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:-translate-y-1 transition-transform">
-                     <div className="flex justify-between items-start mb-4">
-                       <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl"><Clock size={24} /></div>
-                       <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-md">Pipeline</span>
-                     </div>
-                     <p className="text-sm font-bold text-slate-500 mb-1">รอดำเนินการ</p>
-                     <p className="text-4xl font-black text-slate-900">{dashboardData.filter(a=>['รอสัมภาษณ์','รอเริ่มงาน','ตรวจสุขภาพ'].includes(a.status)).length}</p>
-                   </div>
-     
-                   <div className="bg-white p-7 rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:-translate-y-1 transition-transform">
-                     <div className="flex justify-between items-start mb-4">
-                       <div className="p-3 bg-red-50 text-red-600 rounded-2xl"><AlertCircle size={24} /></div>
-                       <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded-md">
-                         {dashboardData.length > 0 ? Math.round((dashboardData.filter(a=>a.status === 'ไม่ผ่าน').length / dashboardData.length) * 100) : 0}% Loss
-                       </span>
-                     </div>
-                     <p className="text-sm font-bold text-slate-500 mb-1">ไม่ผ่านการพิจารณา</p>
-                     <p className="text-4xl font-black text-slate-900">{dashboardData.filter(a=>a.status === 'ไม่ผ่าน').length}</p>
-                   </div>
-                 </div>
-     
-                 {/* Recruitment Pipeline Funnel & Charts */}
-                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                   <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col">
-                     <div className="mb-6 flex items-center justify-between">
-                       <div>
-                         <h3 className="font-bold text-lg text-slate-900">แหล่งที่มาแยกตามสาขา (Source)</h3>
-                       </div>
-                       <div className="p-2 bg-blue-50 text-blue-600 rounded-xl"><Building2 size={20} /></div>
-                     </div>
-                     <div className="flex-1 min-h-[300px]">
-                       <ResponsiveContainer width="100%" height="100%">
-                         <BarChart data={branchChartData} margin={{ top: 10, bottom: 0, left: -20, right: 10 }}>
-                           <defs>
-                             <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-                               <stop offset="5%" stopColor="#3B82F6" stopOpacity={1}/>
-                               <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0.8}/>
-                             </linearGradient>
-                           </defs>
-                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                           <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 11, fill: '#64748B', fontWeight: 600}} dy={10} />
-                           <YAxis axisLine={false} tickLine={false} tick={{fontSize: 11, fill: '#94A3B8', fontWeight: 500}} allowDecimals={false} />
-                           <RechartsTooltip cursor={{ fill: '#F8FAFC' }} contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontWeight: 600 }} />
-                           <Bar dataKey="count" name="จำนวน (คน)" fill="url(#colorCount)" radius={[6,6,0,0]} barSize={40} />
-                         </BarChart>
-                       </ResponsiveContainer>
-                     </div>
-                   </div>
-     
-                   <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col">
-                     <div className="mb-6 flex items-center justify-between">
-                       <div>
-                         <h3 className="font-bold text-lg text-slate-900">อัตราส่วนสถานะผู้สมัคร (Status Mix)</h3>
-                       </div>
-                       <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl"><PieChart className="w-5 h-5" /></div>
-                     </div>
-                     <div className="flex-1 min-h-[300px]">
-                       <ResponsiveContainer width="100%" height="100%">
-                         <PieChart>
-                           <Pie data={statusChartData} innerRadius={80} outerRadius={115} paddingAngle={3} dataKey="value" stroke="none">
-                             {statusChartData.map((e, i) => <Cell key={i} fill={STATUS_COLORS[e.name] || '#CBD5E1'} />)}
-                           </Pie>
-                           <RechartsTooltip contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                           <Legend layout="vertical" align="right" verticalAlign="middle" wrapperStyle={{ fontSize: '13px', color: '#475569', fontWeight: 600 }} />
-                         </PieChart>
-                       </ResponsiveContainer>
-                     </div>
-                   </div>
-                   
-                   {/* กราฟ SLA เพิ่มเติม */}
-                   <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col lg:col-span-2">
-                     <div className="mb-6 flex items-center justify-between">
-                       <div>
-                         <h3 className="font-bold text-lg text-slate-900">อายุของตำแหน่งงานว่าง (Vacancy SLA Aging)</h3>
-                         <p className="text-sm text-slate-500 mt-1">จำนวนตำแหน่งงานที่ยังเปิดรับ แยกตามระยะเวลาตั้งแต่เริ่มเปิด (วัน)</p>
-                       </div>
-                       <div className="p-2 bg-rose-50 text-rose-600 rounded-xl"><Clock size={20} /></div>
-                     </div>
-                     <div className="flex-1 min-h-[300px]">
-                       <ResponsiveContainer width="100%" height="100%">
-                         <BarChart data={slaChartData} margin={{ top: 10, bottom: 0, left: -20, right: 10 }}>
-                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                           <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#64748B', fontWeight: 600}} dy={10} />
-                           <YAxis axisLine={false} tickLine={false} tick={{fontSize: 11, fill: '#94A3B8', fontWeight: 500}} allowDecimals={false} />
-                           <RechartsTooltip cursor={{ fill: '#F8FAFC' }} contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontWeight: 600 }} />
-                           <Bar dataKey="count" name="จำนวนตำแหน่ง (งาน)" radius={[6,6,0,0]} barSize={50}>
-                             {slaChartData.map((entry, index) => (
-                               <Cell key={`cell-${index}`} fill={entry.fill} />
-                             ))}
-                           </Bar>
-                         </BarChart>
-                       </ResponsiveContainer>
-                     </div>
-                   </div>
-
-                 </div>
-               </div>
+                </div>
+              </div>
             )}
 
-            {/* Modal: ตั้งค่าระบบ (Master Data Upload) */}
+            {/* Modals for Settings & Viewing */}
             {showSettings && (
-              <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-                <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-                  <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                    <h3 className="font-bold text-lg flex items-center space-x-2 text-slate-800">
-                      <Settings size={20} className="text-slate-500" />
-                      <span>ตั้งค่าข้อมูลระบบ (Master Data)</span>
-                    </h3>
-                    <button onClick={() => setShowSettings(false)} className="p-2 text-slate-400 hover:bg-slate-200 hover:text-slate-700 rounded-full transition-colors"><X size={20} /></button>
-                  </div>
-                  <div className="p-6 space-y-4 bg-slate-50/50">
-                    <p className="text-sm text-slate-500 mb-4">อัปเดตไฟล์ CSV เพื่อเพิ่มข้อมูลตัวเลือกในระบบ (ใช้คอลัมน์แรกเป็นหลัก)</p>
-                    
-                    <label className="flex items-center justify-between w-full bg-white border border-slate-300 rounded-xl px-4 py-4 hover:border-blue-400 cursor-pointer transition-all shadow-sm group">
-                      <div className="flex items-center space-x-3">
-                        <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-100 transition-colors"><MapPin size={20} /></div>
-                        <div className="text-left">
-                          <span className="block text-sm font-bold text-slate-700">อัปเดตไฟล์สาขา (StoreList)</span>
-                          <span className="block text-xs text-slate-500">รูปแบบ: รหัส, ชื่อ, Area</span>
-                        </div>
-                      </div>
-                      <Upload size={18} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
-                      <input type="file" accept=".csv" className="hidden" onChange={(e) => { handleImportCSV(e); setShowSettings(false); }} />
-                    </label>
-
-                    <label className="flex items-center justify-between w-full bg-white border border-slate-300 rounded-xl px-4 py-4 hover:border-blue-400 cursor-pointer transition-all shadow-sm group">
-                      <div className="flex items-center space-x-3">
-                        <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg group-hover:bg-indigo-100 transition-colors"><Briefcase size={20} /></div>
-                        <div className="text-left">
-                          <span className="block text-sm font-bold text-slate-700">อัปเดตไฟล์ตำแหน่ง-Recruit</span>
-                          <span className="block text-xs text-slate-500">รูปแบบ: ชื่อตำแหน่ง, TA, Area (เว้นได้)</span>
-                        </div>
-                      </div>
-                      <Upload size={18} className="text-slate-400 group-hover:text-indigo-500 transition-colors" />
-                      <input type="file" accept=".csv" className="hidden" onChange={(e) => { handleImportPositionCSV(e); setShowSettings(false); }} />
-                    </label>
-
-                    <label className="flex items-center justify-between w-full bg-white border border-slate-300 rounded-xl px-4 py-4 hover:border-blue-400 cursor-pointer transition-all shadow-sm group">
-                      <div className="flex items-center space-x-3">
-                        <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg group-hover:bg-emerald-100 transition-colors"><Users size={20} /></div>
-                        <div className="text-left">
-                          <span className="block text-sm font-bold text-slate-700">อัปเดตไฟล์รายชื่อ TA</span>
-                          <span className="block text-xs text-slate-500">รายชื่อ TA ในคอลัมน์ A</span>
-                        </div>
-                      </div>
-                      <Upload size={18} className="text-slate-400 group-hover:text-emerald-500 transition-colors" />
-                      <input type="file" accept=".csv" className="hidden" onChange={(e) => { handleImportTACSV(e); setShowSettings(false); }} />
-                    </label>
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60">
+                <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-sm relative">
+                  <button onClick={()=>setShowSettings(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-800"><X/></button>
+                  <h3 className="font-bold text-lg mb-6">ตั้งค่า Master Data (CSV)</h3>
+                  <div className="space-y-3">
+                    <label className="flex items-center justify-between border p-3 rounded-xl cursor-pointer hover:bg-slate-50"><span className="text-sm font-bold">1. อัปเดตไฟล์สาขา</span><Upload size={16}/><input type="file" className="hidden" onChange={e=>{handleImportCSV(e);setShowSettings(false)}}/></label>
+                    <label className="flex items-center justify-between border p-3 rounded-xl cursor-pointer hover:bg-slate-50"><span className="text-sm font-bold">2. ไฟล์ตำแหน่งงาน-TA</span><Upload size={16}/><input type="file" className="hidden" onChange={e=>{handleImportPositionCSV(e);setShowSettings(false)}}/></label>
+                    <label className="flex items-center justify-between border p-3 rounded-xl cursor-pointer hover:bg-slate-50"><span className="text-sm font-bold">3. ไฟล์รายชื่อ TA</span><Upload size={16}/><input type="file" className="hidden" onChange={e=>{handleImportTACSV(e);setShowSettings(false)}}/></label>
                   </div>
                 </div>
               </div>
             )}
             
-            {/* Modal: View Applicants (Popup รายชื่อผู้สมัครเมื่อกดจากตาราง Area HR) */}
             {viewApplicants && (
-               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
-                 <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden">
-                   <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                     <div>
-                       <h3 className="font-bold text-lg text-slate-900">ผู้สมัคร: {viewApplicants.position}</h3>
-                       <p className="text-sm text-slate-500">{viewApplicants.branchName}</p>
-                     </div>
-                     <button onClick={() => setViewApplicants(null)} className="p-2 text-slate-400 hover:bg-slate-200 rounded-full transition-colors"><X size={20} /></button>
-                   </div>
-                   <div className="p-6 max-h-[60vh] overflow-y-auto">
-                     <div className="space-y-3">
-                       {viewApplicants.list.map(app => (
-                         <div key={app.id} className="p-4 rounded-xl border border-slate-100 flex justify-between items-center hover:border-blue-200 transition-colors">
-                           <div className="flex items-start space-x-3">
-                             <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold shrink-0">{app.name.charAt(0)}</div>
-                             <div>
-                               <p className="font-bold text-slate-900">{app.name}</p>
-                               <div className="flex flex-wrap items-center gap-2 mt-1">
-                                 <p className="text-sm text-slate-500 flex items-center"><Phone size={12} className="mr-1"/> {app.phone}</p>
-                                 
-                                 {app.resumeBase64 && (
-                                   <button 
-                                     onClick={() => setPreviewFile({ base64: app.resumeBase64, name: app.resumeName })}
-                                     className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md border border-blue-200 flex items-center hover:bg-blue-600 hover:text-white transition-colors"
-                                     title="ดูตัวอย่างเรซูเม่"
-                                   >
-                                     <Eye size={12} className="mr-1"/> เรซูเม่
-                                   </button>
-                                 )}
-                               </div>
-                             </div>
-                           </div>
-                           <div className="text-right shrink-0">
-                             <span className="inline-block px-2.5 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: `${STATUS_COLORS[app.status]}15`, color: STATUS_COLORS[app.status] }}>{app.status}</span>
-                             {app.status === 'รอเริ่มงาน' && app.startDate && <div className="text-[10px] text-sky-600 mt-1 font-semibold">เริ่มงาน: {new Date(app.startDate).toLocaleDateString('th-TH')}</div>}
-                             {app.status === 'มาเริ่มงาน' && app.startDate && <div className="text-[10px] text-emerald-600 mt-1 font-semibold">เริ่มงานเมื่อ: {new Date(app.startDate).toLocaleDateString('th-TH')}</div>}
-                             <p className="text-[10px] text-slate-400 mt-1">โดย {app.ta}</p>
-                           </div>
-                         </div>
-                       ))}
-                     </div>
-                   </div>
-                 </div>
-               </div>
-             )}
-
-            {/* Modal: Preview File (แสดงไฟล์เรซูเม่) */}
-            {previewFile && (
-              <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden">
-                  <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                    <div>
-                      <h3 className="font-bold text-lg text-slate-900 flex items-center space-x-2">
-                        <Eye size={20} className="text-blue-500" />
-                        <span>ตัวอย่างไฟล์เอกสาร</span>
-                      </h3>
-                      <p className="text-sm text-slate-500 mt-0.5">{previewFile.name}</p>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <a 
-                        href={previewFile.base64} 
-                        download={previewFile.name} 
-                        className="flex items-center space-x-1.5 px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl transition-colors font-semibold shadow-sm text-sm"
-                      >
-                        <Download size={16} /><span>ดาวน์โหลด</span>
-                      </a>
-                      <button onClick={() => setPreviewFile(null)} className="p-2 text-slate-400 hover:bg-slate-200 hover:text-slate-700 rounded-full transition-colors"><X size={20} /></button>
-                    </div>
-                  </div>
-                  
-                  <div className="flex-1 bg-slate-100 p-4 sm:p-6 flex items-center justify-center overflow-hidden">
-                    {previewFile.base64.startsWith('data:application/pdf') || previewFile.base64.startsWith('data:image/') ? (
-                      <iframe 
-                        src={previewFile.base64} 
-                        className="w-full h-full rounded-xl border border-slate-200 shadow-sm bg-white" 
-                        title="File Preview"
-                      ></iframe>
-                    ) : (
-                      <div className="text-center bg-white p-12 rounded-2xl shadow-sm border border-slate-200 max-w-sm">
-                        <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                          <FileText size={40} className="text-orange-400" />
-                        </div>
-                        <p className="text-lg font-bold text-slate-800 mb-2">ไม่สามารถแสดงตัวอย่างไฟล์ได้</p>
-                        <p className="text-sm text-slate-500 mb-6">ไฟล์ประเภท Word (doc, docx) หรือไฟล์อื่นๆ จำเป็นต้องดาวน์โหลดเพื่อเปิดดูในเครื่องของคุณครับ</p>
-                        <a 
-                          href={previewFile.base64} 
-                          download={previewFile.name} 
-                          className="inline-flex items-center justify-center space-x-2 bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors font-semibold shadow-sm w-full"
-                        >
-                          <Download size={18} /><span>ดาวน์โหลดไฟล์</span>
-                        </a>
-                      </div>
-                    )}
-                  </div>
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60">
+                <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-lg relative max-h-[80vh] overflow-y-auto">
+                  <button onClick={()=>setViewApplicants(null)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-800"><X/></button>
+                  <h3 className="font-bold text-lg mb-4">ผู้สมัคร: {viewApplicants.position}</h3>
+                  <div className="space-y-2">{viewApplicants.list.map(a=><div key={a.id} className="p-3 border rounded-xl flex justify-between"><div className="text-sm"><p className="font-bold">{a.name}</p><p className="text-slate-500">{a.phone}</p></div><div className="text-right"><span className="text-xs font-bold bg-slate-100 px-2 py-1 rounded">{a.status}</span><p className="text-[10px] mt-1">{a.ta}</p></div></div>)}</div>
                 </div>
               </div>
             )}
-
+            
+            {previewFile && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80">
+                <div className="bg-white p-4 rounded-xl w-full max-w-3xl h-[80vh] flex flex-col relative">
+                  <button onClick={()=>setPreviewFile(null)} className="absolute -top-3 -right-3 bg-white rounded-full p-1 shadow-md"><X/></button>
+                  {previewFile.base64.startsWith('data:image/') || previewFile.base64.startsWith('data:application/pdf') ? <iframe src={previewFile.base64} className="w-full h-full rounded border"/> : <div className="flex-1 flex items-center justify-center"><a href={previewFile.base64} download={previewFile.name} className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold">ดาวน์โหลดไฟล์ {previewFile.name}</a></div>}
+                </div>
+              </div>
+            )}
           </main>
         </div>
       );
