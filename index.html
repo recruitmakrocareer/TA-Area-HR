@@ -47,10 +47,12 @@
       { code: '004', name: 'สาขาบางบอน', area: 'Area 1' }
     ];
 
-    const STATUSES = ['รอสัมภาษณ์', 'ไม่เข้าสัมภาษณ์', 'ผ่าน', 'ไม่ผ่าน', 'สำรอง', 'ตรวจสุขภาพ', 'รอเริ่มงาน', 'มาเริ่มงาน', 'ไม่มาเริ่มงาน', 'อื่นๆ'];
+    // เพิ่ม "รอพิจารณาประวัติ" เข้าไปในลิสต์
+    const STATUSES = ['รอพิจารณาประวัติ', 'รอสัมภาษณ์', 'ไม่เข้าสัมภาษณ์', 'ผ่าน', 'ไม่ผ่าน', 'สำรอง', 'ตรวจสุขภาพ', 'รอเริ่มงาน', 'มาเริ่มงาน', 'ไม่มาเริ่มงาน', 'อื่นๆ'];
     const VACANCY_STATUSES = ['Vacant', 'Promote&Transfer', 'Hold', 'Closed'];
 
-    const STATUS_COLORS = { 'รอสัมภาษณ์': '#F59E0B', 'ไม่เข้าสัมภาษณ์': '#64748B', 'ผ่าน': '#10B981', 'ไม่ผ่าน': '#EF4444', 'สำรอง': '#3B82F6', 'ตรวจสุขภาพ': '#8B5CF6', 'รอเริ่มงาน': '#0EA5E9', 'มาเริ่มงาน': '#059669', 'ไม่มาเริ่มงาน': '#94A3B8', 'อื่นๆ': '#F97316' };
+    // เพิ่มสีให้ "รอพิจารณาประวัติ"
+    const STATUS_COLORS = { 'รอพิจารณาประวัติ': '#06B6D4', 'รอสัมภาษณ์': '#F59E0B', 'ไม่เข้าสัมภาษณ์': '#64748B', 'ผ่าน': '#10B981', 'ไม่ผ่าน': '#EF4444', 'สำรอง': '#3B82F6', 'ตรวจสุขภาพ': '#8B5CF6', 'รอเริ่มงาน': '#0EA5E9', 'มาเริ่มงาน': '#059669', 'ไม่มาเริ่มงาน': '#94A3B8', 'อื่นๆ': '#F97316' };
     const VACANCY_COLORS = { 'Vacant': '#F59E0B', 'Promote&Transfer': '#8B5CF6', 'Hold': '#64748B', 'Closed': '#94A3B8', 'รอตรวจสุขภาพ': '#0EA5E9', 'รอเริ่มงาน': '#0EA5E9', 'Hiring': '#10B981' };
 
     const parseDateToMs = (val) => {
@@ -303,7 +305,7 @@
         const reader = new FileReader();
         reader.onload = (evt) => {
           try {
-            const wb = XLSX.read(evt.target.result, { type: 'binary' });
+            const wb = XLSX.read(bstr, { type: 'binary' });
             const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
             const newTAs = [];
             for (let i = 1; i < data.length; i++) {
@@ -399,6 +401,15 @@
         const newVacs = [newVacancy, ...vacancies];
         setVacancies(newVacs); setVacancyForm({ branchCode: '', position: '', manualStatus: 'Vacant' });
         syncToCloud(applicants, newVacs);
+        
+        if (GOOGLE_SCRIPT_URL && cloudStatus === 'connected') {
+          try {
+            fetch(GOOGLE_SCRIPT_URL, {
+              method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify({ action: 'notifyNewVacancy', vacancy: newVacancy })
+            });
+          } catch (error) { console.error('Email Error:', error); }
+        }
       };
 
       const deleteVacancy = (id) => {
@@ -624,7 +635,7 @@
                             <tr key={app.id} className="bg-blue-50/50"><td className="p-3 font-semibold text-xs">{app.branchName}</td><td className="p-3 space-y-1"><input value={editAppForm.name} onChange={e=>setEditAppForm({...editAppForm, name:e.target.value})} className="w-full border p-1 text-xs"/><input value={editAppForm.phone} onChange={e=>setEditAppForm({...editAppForm, phone:e.target.value})} className="w-full border p-1 text-xs"/></td><td className="p-3 space-y-1"><select value={editAppForm.status} onChange={e=>setEditAppForm({...editAppForm, status:e.target.value})} className="w-full border p-1 text-xs">{STATUSES.map(s=><option key={s}>{s}</option>)}</select>{editAppForm.status==='รอเริ่มงาน'&&<input type="date" value={editAppForm.startDate||''} onChange={e=>setEditAppForm({...editAppForm, startDate:e.target.value})} className="w-full border p-1 text-xs"/>}{['อื่นๆ','ไม่ผ่าน','ไม่มาเริ่มงาน'].includes(editAppForm.status)&&<input placeholder="เหตุผล" value={editAppForm.comment||''} onChange={e=>setEditAppForm({...editAppForm, comment:e.target.value})} className="w-full border p-1 text-xs"/>}</td><td className="p-3 text-right"><button onClick={saveEditApp} className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs mr-2">บันทึก</button><button onClick={()=>setEditAppId(null)} className="bg-slate-200 px-2 py-1 rounded text-xs">ยกเลิก</button></td></tr>
                           )
                           return (
-                            <tr key={app.id} className="border-t hover:bg-slate-50"><td className="p-4"><div className="font-semibold">{app.branchName}</div></td><td className="p-4 cursor-pointer group" onClick={()=>startEditApp(app)}><div className="font-bold group-hover:text-blue-600">{app.name} <Edit size={12} className="inline opacity-0 group-hover:opacity-100"/></div><div className="text-xs text-slate-500">{app.position} • {app.phone}</div></td><td className="p-4"><select value={app.status} onChange={e=>handleInlineStatusChange(app, e.target.value)} className="status-select font-bold text-xs px-2 py-1 rounded-full outline-none border" style={{color:STATUS_COLORS[app.status], borderColor:STATUS_COLORS[app.status]}}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select>{app.status==='รอเริ่มงาน'&&app.startDate&&<div className="text-[10px] text-sky-600 mt-1">เริ่ม: {new Date(app.startDate).toLocaleDateString('th')}</div>}</td><td className="p-4 text-right space-x-2"><button onClick={()=>startEditApp(app)} className="text-slate-400 hover:text-blue-600"><Edit size={16}/></button><button onClick={()=>deleteApplicant(app.id)} className="text-slate-400 hover:text-red-600"><Trash2 size={16}/></button></td></tr>
+                            <tr key={app.id} className="border-t hover:bg-slate-50"><td className="p-4"><div className="font-semibold">{app.branchName}</div></td><td className="p-4 cursor-pointer group" onClick={()=>startEditApp(app)}><div className="font-bold group-hover:text-blue-600">{app.name} <Edit size={12} className="inline opacity-0 group-hover:opacity-100"/></div><div className="text-xs text-slate-500">{app.position} • {app.phone}</div></td><td className="p-4"><select value={app.status} onChange={e=>handleInlineStatusChange(app, e.target.value)} className="status-select font-bold text-xs px-2 py-1 rounded-full outline-none border" style={{color:STATUS_COLORS[app.status], borderColor:STATUS_COLORS[app.status]}}>{STATUSES.map(s=><option key={s}>{s}</option>)}</select>{app.comment && <div className="text-xs text-slate-500 mt-1.5 max-w-[200px] truncate" title={app.comment}>เหตุผล: {app.comment}</div>}{app.status==='รอเริ่มงาน'&&app.startDate&&<div className="text-[10px] text-sky-600 mt-1">เริ่ม: {new Date(app.startDate).toLocaleDateString('th')}</div>}</td><td className="p-4 text-right space-x-2"><button onClick={()=>startEditApp(app)} className="text-slate-400 hover:text-blue-600"><Edit size={16}/></button><button onClick={()=>deleteApplicant(app.id)} className="text-slate-400 hover:text-red-600"><Trash2 size={16}/></button></td></tr>
                           )
                         })}
                       </tbody></table></div>
@@ -660,7 +671,7 @@
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                    <div className="bg-white p-5 rounded-2xl border shadow-sm"><div className="text-sm text-slate-500 font-bold mb-2">รวมผู้สมัคร</div><div className="text-3xl font-black">{dashboardData.length}</div></div>
                    <div className="bg-white p-5 rounded-2xl border shadow-sm"><div className="text-sm text-emerald-600 font-bold mb-2">สำเร็จ (Hired)</div><div className="text-3xl font-black">{dashboardData.filter(a=>['มาเริ่มงาน','ผ่าน'].includes(a.status)).length}</div></div>
-                   <div className="bg-white p-5 rounded-2xl border shadow-sm"><div className="text-sm text-amber-600 font-bold mb-2">รอดำเนินการ</div><div className="text-3xl font-black">{dashboardData.filter(a=>['รอสัมภาษณ์','รอเริ่มงาน','ตรวจสุขภาพ'].includes(a.status)).length}</div></div>
+                   <div className="bg-white p-5 rounded-2xl border shadow-sm"><div className="text-sm text-amber-600 font-bold mb-2">รอดำเนินการ</div><div className="text-3xl font-black">{dashboardData.filter(a=>['รอพิจารณาประวัติ', 'รอสัมภาษณ์','รอเริ่มงาน','ตรวจสุขภาพ'].includes(a.status)).length}</div></div>
                    <div className="bg-white p-5 rounded-2xl border shadow-sm"><div className="text-sm text-red-600 font-bold mb-2">ไม่ผ่าน/ปฏิเสธ</div><div className="text-3xl font-black">{dashboardData.filter(a=>['ไม่ผ่าน','ไม่มาเริ่มงาน'].includes(a.status)).length}</div></div>
                 </div>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -700,7 +711,7 @@
                 <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-lg relative max-h-[80vh] overflow-y-auto">
                   <button onClick={()=>setViewApplicants(null)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-800"><X/></button>
                   <h3 className="font-bold text-lg mb-4">ผู้สมัคร: {viewApplicants.position}</h3>
-                  <div className="space-y-2">{viewApplicants.list.map(a=><div key={a.id} className="p-3 border rounded-xl flex justify-between"><div className="text-sm"><p className="font-bold">{a.name}</p><p className="text-slate-500">{a.phone}</p></div><div className="text-right"><span className="text-xs font-bold bg-slate-100 px-2 py-1 rounded">{a.status}</span><p className="text-[10px] mt-1">{a.ta}</p></div></div>)}</div>
+                  <div className="space-y-2">{viewApplicants.list.map(a=><div key={a.id} className="p-3 border rounded-xl flex justify-between"><div className="text-sm"><p className="font-bold">{a.name}</p><p className="text-slate-500">{a.phone}</p></div><div className="text-right"><span className="text-xs font-bold bg-slate-100 px-2 py-1 rounded" style={{color:STATUS_COLORS[a.status]}}>{a.status}</span><p className="text-[10px] mt-1">{a.ta}</p></div></div>)}</div>
                 </div>
               </div>
             )}
