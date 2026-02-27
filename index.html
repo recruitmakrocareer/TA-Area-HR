@@ -47,11 +47,35 @@
       { code: '004', name: 'สาขาบางบอน', area: 'Area 1' }
     ];
 
-    const STATUSES = ['รอพิจารณาประวัติ', 'รอสัมภาษณ์', 'ไม่เข้าสัมภาษณ์', 'ผ่าน', 'ไม่ผ่าน', 'สำรอง', 'ตรวจสุขภาพ', 'รอเริ่มงาน', 'มาเริ่มงาน', 'ไม่มาเริ่มงาน', 'อื่นๆ'];
+    // เพิ่มสถานะ รอเริ่มงาน
+    const STATUSES = ['ผ่านสัมภาษณ์', 'รอผลสัมภาษณ์', 'ติดต่อผู้สมัครไม่ได้', 'อยู่ระหว่างนัดสัมภาษณ์', 'ยกเลิกสัมภาษณ์/ไม่มาตามนัด', 'ไม่ผ่านสัมภาษณ์', 'ไม่มีตำแหน่งงานว่าง', 'สำรอง/เก็บไว้พิจารณา', 'ตรวจสุขภาพ', 'รอเริ่มงาน', 'อื่นๆ'];
     const VACANCY_STATUSES = ['Vacant', 'Promote&Transfer', 'Promote&Transfer Done', 'Hold', 'Closed'];
 
-    const STATUS_COLORS = { 'รอพิจารณาประวัติ': '#06B6D4', 'รอสัมภาษณ์': '#F59E0B', 'ไม่เข้าสัมภาษณ์': '#64748B', 'ผ่าน': '#10B981', 'ไม่ผ่าน': '#EF4444', 'สำรอง': '#3B82F6', 'ตรวจสุขภาพ': '#8B5CF6', 'รอเริ่มงาน': '#0EA5E9', 'มาเริ่มงาน': '#059669', 'ไม่มาเริ่มงาน': '#94A3B8', 'อื่นๆ': '#F97316' };
-    const VACANCY_COLORS = { 'Vacant': '#F59E0B', 'Promote&Transfer': '#8B5CF6', 'Promote&Transfer Done': '#10B981', 'Hold': '#64748B', 'Closed': '#94A3B8', 'รอตรวจสุขภาพ': '#0EA5E9', 'รอเริ่มงาน': '#0EA5E9', 'Hiring': '#10B981' };
+    const STATUS_COLORS = { 
+      'ผ่านสัมภาษณ์': '#10B981', 
+      'รอผลสัมภาษณ์': '#3B82F6', 
+      'ติดต่อผู้สมัครไม่ได้': '#64748B', 
+      'อยู่ระหว่างนัดสัมภาษณ์': '#F59E0B', 
+      'ยกเลิกสัมภาษณ์/ไม่มาตามนัด': '#EF4444', 
+      'ไม่ผ่านสัมภาษณ์': '#DC2626', 
+      'ไม่มีตำแหน่งงานว่าง': '#94A3B8', 
+      'สำรอง/เก็บไว้พิจารณา': '#8B5CF6', 
+      'ตรวจสุขภาพ': '#06B6D4', 
+      'รอเริ่มงาน': '#0EA5E9',
+      'อื่นๆ': '#F97316' 
+    };
+    
+    // อัปเดตสีสถานะสำหรับ Area HR
+    const VACANCY_COLORS = { 
+      'Vacant': '#F59E0B', 
+      'Promote&Transfer': '#8B5CF6', 
+      'Promote&Transfer Done': '#10B981', 
+      'Hold': '#64748B', 
+      'Closed': '#94A3B8', 
+      'รอตรวจสุขภาพ': '#06B6D4', 
+      'Waiting to Join': '#0EA5E9', 
+      'Hired': '#10B981' 
+    };
 
     const parseDateToMs = (val) => {
       if (!val) return null;
@@ -116,7 +140,7 @@
       const [editVacId, setEditVacId] = useState(null);
       const [editVacForm, setEditVacForm] = useState({});
       const [dashboardTA, setDashboardTA] = useState('ALL');
-      const [vacancyPositionFilter, setVacancyPositionFilter] = useState(''); // State สำหรับ Filter ตำแหน่งงาน
+      const [vacancyPositionFilter, setVacancyPositionFilter] = useState('');
 
       const uniquePositionNames = useMemo(() => [...new Set(appPositions.map(p => p.position))], [appPositions]);
 
@@ -135,7 +159,6 @@
         const initLoad = async () => {
           setIsLoading(true);
           setCloudStatus('loading');
-          let isCloudSuccess = false;
           let loadedApps = [];
           let loadedVacs = [];
 
@@ -143,7 +166,6 @@
             if (GOOGLE_SCRIPT_URL) {
               const res = await fetch(`${GOOGLE_SCRIPT_URL}?t=${new Date().getTime()}`);
               const data = await res.json();
-              isCloudSuccess = true;
               setCloudStatus('connected');
               
               if (data.applicants) loadedApps = data.applicants.map(a => ({...a, id: String(a.id), branchCode: String(a.branchCode).padStart(3, '0')}));
@@ -173,29 +195,9 @@
             else setAppPositions(DEFAULT_POSITIONS);
           }
 
-          let needsAutoSync = false;
-          const today = new Date();
-          today.setHours(0,0,0,0);
-          
-          loadedApps = loadedApps.map(a => {
-            if (a.status === 'รอเริ่มงาน' && a.startDate) {
-              const sDate = new Date(a.startDate);
-              sDate.setHours(0,0,0,0);
-              if (sDate <= today) {
-                needsAutoSync = true;
-                return { ...a, status: 'มาเริ่มงาน' };
-              }
-            }
-            return a;
-          });
-
           setApplicants(loadedApps);
           setVacancies(loadedVacs);
           setIsLoading(false);
-
-          if (needsAutoSync && isCloudSuccess) {
-            syncToCloud(loadedApps, loadedVacs, true);
-          }
         };
         initLoad();
       }, []);
@@ -339,7 +341,12 @@
       const handleRecruitSubmit = async (e) => {
         e.preventDefault();
         if (!selectedTA || !addingApplicantFor) return;
-        if (formData.status === 'รอเริ่มงาน' && !formData.startDate) { alert('กรุณาระบุวันที่เริ่มงาน'); return; }
+
+        // บังคับกรอกวันที่เริ่มงาน
+        if (formData.status === 'รอเริ่มงาน' && !formData.startDate) { 
+          alert('กรุณาระบุวันที่เริ่มงาน'); 
+          return; 
+        }
         
         const newRecord = { 
           id: Date.now().toString(), ta: selectedTA, branchCode: String(addingApplicantFor.branchCode).padStart(3, '0'), 
@@ -362,16 +369,26 @@
       const startEditApp = (app) => { setEditAppId(app.id); setEditAppForm({ ...app }); };
       
       const saveEditApp = () => {
-        if (['อื่นๆ', 'ไม่ผ่าน', 'ไม่มาเริ่มงาน'].includes(editAppForm.status) && !editAppForm.comment) { alert('กรุณาระบุเหตุผล'); return; }
-        if (editAppForm.status === 'รอเริ่มงาน' && !editAppForm.startDate) { alert('กรุณาระบุวันที่เริ่มงาน'); return; }
-        if (!['อื่นๆ', 'ไม่ผ่าน', 'ไม่มาเริ่มงาน'].includes(editAppForm.status)) editAppForm.comment = '';
+        // บังคับกรอกเหตุผลสำหรับสถานะเชิงปฏิเสธ
+        if (['อื่นๆ', 'ติดต่อผู้สมัครไม่ได้', 'ยกเลิกสัมภาษณ์/ไม่มาตามนัด', 'ไม่ผ่านสัมภาษณ์', 'ไม่มีตำแหน่งงานว่าง'].includes(editAppForm.status) && !editAppForm.comment) { 
+          alert('กรุณาระบุเหตุผล'); 
+          return; 
+        }
+        // บังคับกรอกวันที่เริ่มงานสำหรับสถานะรอเริ่มงาน
+        if (editAppForm.status === 'รอเริ่มงาน' && !editAppForm.startDate) { 
+          alert('กรุณาระบุวันที่เริ่มงาน'); 
+          return; 
+        }
+
+        if (!['อื่นๆ', 'ติดต่อผู้สมัครไม่ได้', 'ยกเลิกสัมภาษณ์/ไม่มาตามนัด', 'ไม่ผ่านสัมภาษณ์', 'ไม่มีตำแหน่งงานว่าง'].includes(editAppForm.status)) editAppForm.comment = '';
         
         const newApps = applicants.map(a => String(a.id) === String(editAppId) ? { ...editAppForm, updatedAt: Date.now() } : a);
         setApplicants(newApps); setEditAppId(null); syncToCloud(newApps, vacancies);
       };
 
       const handleInlineStatusChange = (app, newStatus) => {
-        if (['อื่นๆ', 'ไม่ผ่าน', 'ไม่มาเริ่มงาน', 'รอเริ่มงาน'].includes(newStatus)) {
+        // ให้เด้ง Modal Edit ถ้าระบุสถานะที่ต้องการข้อมูลเพิ่มเติม
+        if (['อื่นๆ', 'ติดต่อผู้สมัครไม่ได้', 'ยกเลิกสัมภาษณ์/ไม่มาตามนัด', 'ไม่ผ่านสัมภาษณ์', 'ไม่มีตำแหน่งงานว่าง', 'รอเริ่มงาน'].includes(newStatus)) {
           startEditApp({ ...app, status: newStatus });
         } else {
           const updatedApp = { ...app, status: newStatus, comment: '', startDate: '', updatedAt: Date.now() };
@@ -448,33 +465,62 @@
 
       const availableBranchesForAreas = appBranches.filter(b => selectedAreas.includes(b.area));
       
-      // เพิ่ม Filter ตำแหน่งงานในลอจิกการกรอง
       const filteredVacancies = vacancies.filter(v => {
         const areaMatch = selectedAreas.length === 0 || selectedAreas.includes(v.area);
         const positionMatch = vacancyPositionFilter === '' || v.position === vacancyPositionFilter;
         return areaMatch && positionMatch;
       });
 
-      // ดึงเฉพาะตำแหน่งงานที่มีการเปิดรับอยู่จริง (สำหรับทำตัวเลือกใน Dropdown Filter)
       const availableVacancyPositions = useMemo(() => {
-        // กรองหาเฉพาะงานใน Area ที่เลือกไว้ก่อน
         const vacsInAreas = vacancies.filter(v => selectedAreas.length === 0 || selectedAreas.includes(v.area));
-        // ดึงเอาเฉพาะชื่อตำแหน่งที่ซ้ำกันออก แล้วเรียงลำดับ
         return [...new Set(vacsInAreas.map(v => v.position))].sort();
       }, [vacancies, selectedAreas]);
 
+      // คำนวณ Insights และตรรกะผูกวันที่เริ่มงานกับสถานะ Hired / Waiting to Join
       const getVacancyInsights = (v) => {
         const matchedApplicants = applicants.filter(app => String(app.branchCode) === String(v.branchCode) && String(app.position) === String(v.position));
         const applicantCount = matchedApplicants.length;
         let computedStatus = v.manualStatus;
+        
         if (v.manualStatus !== 'Closed') {
-          if (matchedApplicants.some(app => app.status === 'มาเริ่มงาน')) computedStatus = 'Hiring';
-          else if (matchedApplicants.some(app => app.status === 'รอเริ่มงาน')) computedStatus = 'รอเริ่มงาน';
-          else if (matchedApplicants.some(app => app.status === 'ตรวจสุขภาพ')) computedStatus = 'รอตรวจสุขภาพ';
+          let hasHired = false;
+          let hasWaitingToJoin = false;
+          let hasHealthCheck = false;
+          
+          const today = new Date();
+          today.setHours(0,0,0,0);
+
+          matchedApplicants.forEach(app => {
+            if (app.status === 'ผ่านสัมภาษณ์') hasHired = true;
+            
+            // ตรรกะเช็ควันที่เริ่มงาน
+            if (app.status === 'รอเริ่มงาน') {
+              if (app.startDate) {
+                const sDate = new Date(app.startDate);
+                sDate.setHours(0,0,0,0);
+                if (today >= sDate) {
+                  hasHired = true; // ถึงวันแล้ว ถือว่า Hired
+                } else {
+                  hasWaitingToJoin = true; // ยังไม่ถึงวัน ถือว่า Waiting to Join
+                }
+              } else {
+                hasWaitingToJoin = true;
+              }
+            }
+            if (app.status === 'ตรวจสุขภาพ') hasHealthCheck = true;
+          });
+
+          if (hasHired) computedStatus = 'Hired';
+          else if (hasWaitingToJoin) computedStatus = 'Waiting to Join';
+          else if (hasHealthCheck) computedStatus = 'รอตรวจสุขภาพ';
         }
         
         let slaEndTime = Date.now();
-        const hiredApps = matchedApplicants.filter(app => ['รอเริ่มงาน', 'มาเริ่มงาน'].includes(app.status));
+        // หยุดนับ SLA เมื่อสถานะเปลี่ยนเป็น ผ่านสัมภาษณ์ หรือ รอเริ่มงาน (ไม่ต้องรอให้ถึงวันที่เริ่มงานจริง)
+        const hiredApps = matchedApplicants.filter(app => {
+          return ['ผ่านสัมภาษณ์', 'รอเริ่มงาน'].includes(app.status);
+        });
+
         if (hiredApps.length > 0) {
           slaEndTime = Math.min(...hiredApps.map(a => parseDateToMs(a.updatedAt) || parseDateToMs(a.timestamp) || parseDateToMs(a.id) || Date.now()));
         }
@@ -623,7 +669,6 @@
                     <div className="px-6 py-4 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                       <h3 className="font-bold text-lg">รายการตำแหน่งงาน (Job Vacancies)</h3>
                       <div className="flex items-center w-full sm:w-auto space-x-3">
-                        {/* เพิ่ม Filter กรองตำแหน่งงาน */}
                         <div className="relative flex-1 sm:w-64">
                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                              <Filter size={14} className="text-slate-400" />
@@ -707,9 +752,16 @@
                                   </button>
                                 </td>
                                 <td className="px-5 py-4">
-                                  <span className="px-2.5 py-1 rounded-full text-xs font-bold inline-block" style={{backgroundColor:VACANCY_COLORS[computedStatus]+'15', color:VACANCY_COLORS[computedStatus]}}>
-                                    {computedStatus}
-                                  </span>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="px-2.5 py-1 rounded-full text-xs font-bold inline-block" style={{backgroundColor:VACANCY_COLORS[computedStatus]+'15', color:VACANCY_COLORS[computedStatus]}}>
+                                      {computedStatus}
+                                    </span>
+                                    {computedStatus === 'Hired' && v.manualStatus !== 'Closed' && (
+                                      <button onClick={() => closeVacancy(v.id)} className="flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors animate-pulse shadow-sm border border-amber-200" title="ได้คนแล้ว คลิ๊กเพื่อปิดสถานะงาน">
+                                        <BellRing size={12} className="mr-1"/> แจ้งเตือน: ปิดงาน
+                                      </button>
+                                    )}
+                                  </div>
                                   {computedStatus === 'Promote&Transfer Done' && v.effectiveDate && (
                                     <div className="text-[10px] text-emerald-600 mt-1.5 font-bold">วันที่มีผล: {new Date(v.effectiveDate).toLocaleDateString('th')}</div>
                                   )}
@@ -770,7 +822,7 @@
                               <th className="p-4">สาขา</th>
                               <th className="p-4">ตำแหน่ง</th>
                               <th className="p-4 text-center">รับแล้ว</th>
-                              <th className="p-4">สถานะ</th>
+                              <th className="p-4">สถานะหน้าบ้าน (Area HR)</th>
                               <th className="p-4 text-right">ดำเนินการ</th>
                             </tr>
                           </thead>
@@ -821,12 +873,12 @@
                                     <input value={editAppForm.name} onChange={e=>setEditAppForm({...editAppForm, name:e.target.value})} className="w-full border p-1.5 text-xs rounded"/>
                                     <input value={editAppForm.phone} onChange={e=>setEditAppForm({...editAppForm, phone:e.target.value})} className="w-full border p-1.5 text-xs rounded"/>
                                   </td>
-                                  <td className="p-3 space-y-1">
+                                  <td className="p-3 space-y-1 min-w-[200px]">
                                     <select value={editAppForm.status} onChange={e=>setEditAppForm({...editAppForm, status:e.target.value})} className="w-full border p-1.5 text-xs rounded">
                                       {STATUSES.map(s=><option key={s}>{s}</option>)}
                                     </select>
-                                    {editAppForm.status==='รอเริ่มงาน' && <input type="date" value={editAppForm.startDate||''} onChange={e=>setEditAppForm({...editAppForm, startDate:e.target.value})} className="w-full border p-1.5 text-xs rounded"/>}
-                                    {['อื่นๆ','ไม่ผ่าน','ไม่มาเริ่มงาน'].includes(editAppForm.status) && <input placeholder="เหตุผล" value={editAppForm.comment||''} onChange={e=>setEditAppForm({...editAppForm, comment:e.target.value})} className="w-full border p-1.5 text-xs rounded"/>}
+                                    {editAppForm.status==='รอเริ่มงาน' && <input type="date" value={editAppForm.startDate||''} onChange={e=>setEditAppForm({...editAppForm, startDate:e.target.value})} className="w-full border border-sky-400 p-1.5 text-xs rounded" title="วันที่เริ่มงาน"/>}
+                                    {['อื่นๆ', 'ติดต่อผู้สมัครไม่ได้', 'ยกเลิกสัมภาษณ์/ไม่มาตามนัด', 'ไม่ผ่านสัมภาษณ์', 'ไม่มีตำแหน่งงานว่าง'].includes(editAppForm.status) && <input placeholder="ระบุเหตุผล" value={editAppForm.comment||''} onChange={e=>setEditAppForm({...editAppForm, comment:e.target.value})} className="w-full border border-orange-300 p-1.5 text-xs rounded"/>}
                                   </td>
                                   <td className="p-3 text-right">
                                     <button onClick={saveEditApp} className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 px-2 py-1.5 rounded text-xs mr-2 font-bold transition-colors">บันทึก</button>
@@ -844,11 +896,11 @@
                                     <div className="text-xs text-slate-500">{app.position} • {app.phone}</div>
                                   </td>
                                   <td className="p-4">
-                                    <select value={app.status} onChange={e=>handleInlineStatusChange(app, e.target.value)} className="status-select font-bold text-xs px-3 py-1.5 rounded-full outline-none border transition-colors cursor-pointer" style={{color:STATUS_COLORS[app.status], borderColor:STATUS_COLORS[app.status]}}>
+                                    <select value={app.status} onChange={e=>handleInlineStatusChange(app, e.target.value)} className="status-select font-bold text-xs px-3 py-1.5 rounded-full outline-none border transition-colors cursor-pointer max-w-[180px] truncate" style={{color:STATUS_COLORS[app.status]||'#64748b', borderColor:STATUS_COLORS[app.status]||'#cbd5e1'}}>
                                       {STATUSES.map(s=><option key={s}>{s}</option>)}
                                     </select>
-                                    {app.comment && <div className="text-xs text-slate-500 mt-1.5 max-w-[200px] truncate" title={app.comment}>เหตุผล: {app.comment}</div>}
-                                    {app.status==='รอเริ่มงาน' && app.startDate && <div className="text-[10px] text-sky-600 mt-1 font-bold">เริ่ม: {new Date(app.startDate).toLocaleDateString('th')}</div>}
+                                    {app.status==='รอเริ่มงาน' && app.startDate && <div className="text-[10px] text-sky-600 mt-1.5 font-bold">วันที่เริ่มงาน: {new Date(app.startDate).toLocaleDateString('th')}</div>}
+                                    {app.comment && <div className="text-[10px] text-slate-500 mt-1.5 max-w-[200px] truncate" title={app.comment}>เหตุผล: {app.comment}</div>}
                                   </td>
                                   <td className="p-4 text-right space-x-2">
                                     <button onClick={()=>startEditApp(app)} className="text-slate-400 hover:text-blue-600 transition-colors"><Edit size={16}/></button>
@@ -879,8 +931,15 @@
                           <option value="">-- สถานะปัจจุบัน --</option>
                           {STATUSES.map(s=><option key={s}>{s}</option>)}
                         </select>
-                        {formData.status === 'รอเริ่มงาน' && <input required type="date" name="startDate" value={formData.startDate||''} onChange={handleInputChange} className="w-full border border-sky-300 rounded-xl p-3"/>}
-                        {['อื่นๆ','ไม่ผ่าน','ไม่มาเริ่มงาน'].includes(formData.status) && <textarea required name="comment" value={formData.comment} onChange={handleInputChange} placeholder="ระบุเหตุผล" className="w-full border border-orange-300 rounded-xl p-3 outline-none focus:border-orange-500"></textarea>}
+                        {formData.status === 'รอเริ่มงาน' && (
+                          <div className="space-y-1">
+                            <label className="text-xs font-bold text-sky-600 ml-1">ระบุวันที่เริ่มงาน *</label>
+                            <input required type="date" name="startDate" value={formData.startDate||''} onChange={handleInputChange} className="w-full border border-sky-300 bg-sky-50 rounded-xl p-3 outline-none focus:border-sky-500" title="วันที่เริ่มงาน"/>
+                          </div>
+                        )}
+                        {['อื่นๆ', 'ติดต่อผู้สมัครไม่ได้', 'ยกเลิกสัมภาษณ์/ไม่มาตามนัด', 'ไม่ผ่านสัมภาษณ์', 'ไม่มีตำแหน่งงานว่าง'].includes(formData.status) && (
+                          <textarea required name="comment" value={formData.comment} onChange={handleInputChange} placeholder="ระบุเหตุผลที่ปฏิเสธ / ยกเลิก *" className="w-full border border-orange-300 bg-orange-50 rounded-xl p-3 outline-none focus:border-orange-500"></textarea>
+                        )}
                         <div className="flex items-center space-x-2 border p-3 rounded-xl bg-slate-50">
                           <Upload size={16} className="text-slate-500"/>
                           <input type="file" onChange={handleFileUpload} className="text-sm w-full text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"/>
@@ -916,15 +975,36 @@
                    </div>
                    <div className="bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm hover:shadow-md transition-shadow">
                      <div className="text-sm text-emerald-600 font-bold mb-2 flex items-center space-x-1"><CheckCircle2 size={16}/><span>สำเร็จ (Hired)</span></div>
-                     <div className="text-3xl font-black text-emerald-600">{dashboardData.filter(a=>['มาเริ่มงาน','ผ่าน'].includes(a.status)).length}</div>
+                     <div className="text-3xl font-black text-emerald-600">
+                       {dashboardData.filter(a => {
+                         if (a.status === 'ผ่านสัมภาษณ์') return true;
+                         if (a.status === 'รอเริ่มงาน' && a.startDate) {
+                           const sDate = new Date(a.startDate).setHours(0,0,0,0);
+                           const today = new Date().setHours(0,0,0,0);
+                           return today >= sDate;
+                         }
+                         return false;
+                       }).length}
+                     </div>
                    </div>
                    <div className="bg-white p-5 rounded-2xl border border-amber-100 shadow-sm hover:shadow-md transition-shadow">
                      <div className="text-sm text-amber-600 font-bold mb-2 flex items-center space-x-1"><Clock size={16}/><span>รอดำเนินการ</span></div>
-                     <div className="text-3xl font-black text-amber-600">{dashboardData.filter(a=>['รอพิจารณาประวัติ', 'รอสัมภาษณ์','รอเริ่มงาน','ตรวจสุขภาพ'].includes(a.status)).length}</div>
+                     <div className="text-3xl font-black text-amber-600">
+                       {dashboardData.filter(a => {
+                         if (['รอผลสัมภาษณ์', 'อยู่ระหว่างนัดสัมภาษณ์', 'สำรอง/เก็บไว้พิจารณา', 'ตรวจสุขภาพ'].includes(a.status)) return true;
+                         if (a.status === 'รอเริ่มงาน') {
+                           if (!a.startDate) return true;
+                           const sDate = new Date(a.startDate).setHours(0,0,0,0);
+                           const today = new Date().setHours(0,0,0,0);
+                           return today < sDate;
+                         }
+                         return false;
+                       }).length}
+                     </div>
                    </div>
                    <div className="bg-white p-5 rounded-2xl border border-red-100 shadow-sm hover:shadow-md transition-shadow">
                      <div className="text-sm text-red-600 font-bold mb-2 flex items-center space-x-1"><AlertCircle size={16}/><span>ไม่ผ่าน/ปฏิเสธ</span></div>
-                     <div className="text-3xl font-black text-red-600">{dashboardData.filter(a=>['ไม่ผ่าน','ไม่มาเริ่มงาน'].includes(a.status)).length}</div>
+                     <div className="text-3xl font-black text-red-600">{dashboardData.filter(a=>['ติดต่อผู้สมัครไม่ได้', 'ยกเลิกสัมภาษณ์/ไม่มาตามนัด', 'ไม่ผ่านสัมภาษณ์', 'ไม่มีตำแหน่งงานว่าง'].includes(a.status)).length}</div>
                    </div>
                 </div>
 
