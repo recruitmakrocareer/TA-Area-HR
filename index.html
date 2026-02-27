@@ -28,7 +28,7 @@
     import React, { useState, useMemo, useEffect } from 'https://esm.sh/react@18.2.0';
     import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
     import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'https://esm.sh/recharts@2.12.0?deps=react@18.2.0,react-dom@18.2.0';
-    import { Users, UserPlus, BarChart3, Building2, CheckCircle2, Clock, MapPin, Search, AlertCircle, FileText, Briefcase, Phone, MessageSquare, Map, Target, Edit, Trash2, X, BellRing, Download, Paperclip, Upload, Eye, PlusCircle, Settings, Check } from 'https://esm.sh/lucide-react@0.344.0?deps=react@18.2.0';
+    import { Users, UserPlus, BarChart3, Building2, CheckCircle2, Clock, MapPin, Search, AlertCircle, FileText, Briefcase, Phone, MessageSquare, Map, Target, Edit, Trash2, X, BellRing, Download, Paperclip, Upload, Eye, PlusCircle, Settings, Check, Filter } from 'https://esm.sh/lucide-react@0.344.0?deps=react@18.2.0';
 
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzM4EXsW141-nqY7rRwU_MFc9vnrJSbK-8Wdwn-ZJwvfEBlNMZJH2dhE0r2C4uJf7mnxg/exec"; 
 
@@ -116,6 +116,7 @@
       const [editVacId, setEditVacId] = useState(null);
       const [editVacForm, setEditVacForm] = useState({});
       const [dashboardTA, setDashboardTA] = useState('ALL');
+      const [vacancyPositionFilter, setVacancyPositionFilter] = useState(''); // State สำหรับ Filter ตำแหน่งงาน
 
       const uniquePositionNames = useMemo(() => [...new Set(appPositions.map(p => p.position))], [appPositions]);
 
@@ -446,7 +447,13 @@
       };
 
       const availableBranchesForAreas = appBranches.filter(b => selectedAreas.includes(b.area));
-      const filteredVacancies = vacancies.filter(v => selectedAreas.length === 0 || selectedAreas.includes(v.area));
+      
+      // เพิ่ม Filter ตำแหน่งงานในลอจิกการกรอง
+      const filteredVacancies = vacancies.filter(v => {
+        const areaMatch = selectedAreas.length === 0 || selectedAreas.includes(v.area);
+        const positionMatch = vacancyPositionFilter === '' || v.position === vacancyPositionFilter;
+        return areaMatch && positionMatch;
+      });
 
       const getVacancyInsights = (v) => {
         const matchedApplicants = applicants.filter(app => String(app.branchCode) === String(v.branchCode) && String(app.position) === String(v.position));
@@ -605,11 +612,29 @@
 
                 {selectedAreas.length > 0 && (
                   <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
-                    <div className="px-6 py-5 border-b flex justify-between items-center">
+                    <div className="px-6 py-4 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                       <h3 className="font-bold text-lg">รายการตำแหน่งงาน (Job Vacancies)</h3>
-                      <button onClick={() => exportToExcel(filteredVacancies, 'Vacancies')} className="text-xs bg-emerald-50 text-emerald-700 px-3 py-2 rounded-lg border font-bold flex items-center">
-                        <Download size={14} className="mr-1"/>Export
-                      </button>
+                      <div className="flex items-center w-full sm:w-auto space-x-3">
+                        {/* เพิ่ม Filter กรองตำแหน่งงาน */}
+                        <div className="relative flex-1 sm:w-64">
+                           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                             <Filter size={14} className="text-slate-400" />
+                           </div>
+                           <select
+                             value={vacancyPositionFilter}
+                             onChange={(e) => setVacancyPositionFilter(e.target.value)}
+                             className="w-full pl-9 pr-4 py-2.5 border rounded-lg text-sm outline-none focus:border-blue-500 bg-slate-50 hover:bg-slate-100 transition-colors appearance-none font-medium text-slate-700"
+                           >
+                             <option value="">ทุกตำแหน่งงาน</option>
+                             {uniquePositionNames.map(pos => (
+                               <option key={pos} value={pos}>{pos}</option>
+                             ))}
+                           </select>
+                        </div>
+                        <button onClick={() => exportToExcel(filteredVacancies, 'Vacancies')} className="text-xs bg-emerald-50 text-emerald-700 px-4 py-2.5 rounded-lg border font-bold flex items-center shrink-0 hover:bg-emerald-100 transition-colors shadow-sm">
+                          <Download size={14} className="mr-1.5"/>Export
+                        </button>
+                      </div>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm text-left whitespace-nowrap">
@@ -688,6 +713,13 @@
                               </tr>
                             )
                           })}
+                          {filteredVacancies.length === 0 && (
+                            <tr>
+                              <td colSpan="6" className="px-5 py-8 text-center text-slate-400 font-medium">
+                                ไม่พบข้อมูลตำแหน่งงานที่ตรงกับเงื่อนไข
+                              </td>
+                            </tr>
+                          )}
                         </tbody>
                       </table>
                     </div>
