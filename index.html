@@ -48,10 +48,10 @@
     ];
 
     const STATUSES = ['รอพิจารณาประวัติ', 'รอสัมภาษณ์', 'ไม่เข้าสัมภาษณ์', 'ผ่าน', 'ไม่ผ่าน', 'สำรอง', 'ตรวจสุขภาพ', 'รอเริ่มงาน', 'มาเริ่มงาน', 'ไม่มาเริ่มงาน', 'อื่นๆ'];
-    const VACANCY_STATUSES = ['Vacant', 'Promote&Transfer', 'Hold', 'Closed'];
+    const VACANCY_STATUSES = ['Vacant', 'Promote&Transfer', 'Promote&Transfer Done', 'Hold', 'Closed'];
 
     const STATUS_COLORS = { 'รอพิจารณาประวัติ': '#06B6D4', 'รอสัมภาษณ์': '#F59E0B', 'ไม่เข้าสัมภาษณ์': '#64748B', 'ผ่าน': '#10B981', 'ไม่ผ่าน': '#EF4444', 'สำรอง': '#3B82F6', 'ตรวจสุขภาพ': '#8B5CF6', 'รอเริ่มงาน': '#0EA5E9', 'มาเริ่มงาน': '#059669', 'ไม่มาเริ่มงาน': '#94A3B8', 'อื่นๆ': '#F97316' };
-    const VACANCY_COLORS = { 'Vacant': '#F59E0B', 'Promote&Transfer': '#8B5CF6', 'Hold': '#64748B', 'Closed': '#94A3B8', 'รอตรวจสุขภาพ': '#0EA5E9', 'รอเริ่มงาน': '#0EA5E9', 'Hiring': '#10B981' };
+    const VACANCY_COLORS = { 'Vacant': '#F59E0B', 'Promote&Transfer': '#8B5CF6', 'Promote&Transfer Done': '#10B981', 'Hold': '#64748B', 'Closed': '#94A3B8', 'รอตรวจสุขภาพ': '#0EA5E9', 'รอเริ่มงาน': '#0EA5E9', 'Hiring': '#10B981' };
 
     const parseDateToMs = (val) => {
       if (!val) return null;
@@ -110,7 +110,7 @@
       const [editAppForm, setEditAppForm] = useState({});
       const [previewFile, setPreviewFile] = useState(null);
       const [selectedAreas, setSelectedAreas] = useState([]);
-      const [vacancyForm, setVacancyForm] = useState({ branchCode: '', position: '', manualStatus: 'Vacant' });
+      const [vacancyForm, setVacancyForm] = useState({ branchCode: '', position: '', manualStatus: 'Vacant', effectiveDate: '' });
       const [viewApplicants, setViewApplicants] = useState(null);
       const [vacancies, setVacancies] = useState([]);
       const [editVacId, setEditVacId] = useState(null);
@@ -388,6 +388,12 @@
       
       const handleVacancySubmit = (e) => {
         e.preventDefault();
+        
+        if (vacancyForm.manualStatus === 'Promote&Transfer Done' && !vacancyForm.effectiveDate) { 
+          alert('กรุณาระบุวันที่มีผล (Effective Date)'); 
+          return; 
+        }
+
         const branch = appBranches.find(b => String(b.code) === String(vacancyForm.branchCode));
         if (!branch) { alert('ไม่พบข้อมูลสาขาในระบบ'); return; }
         const isDuplicate = vacancies.some(v => String(v.branchCode) === String(branch.code) && String(v.position) === String(vacancyForm.position) && v.manualStatus !== 'Closed');
@@ -396,10 +402,11 @@
         const newVacancy = { 
           id: Date.now().toString(), area: branch.area, branchCode: String(branch.code).padStart(3, '0'), 
           branchName: branch.name, position: vacancyForm.position, manualStatus: vacancyForm.manualStatus, 
+          effectiveDate: vacancyForm.effectiveDate || '',
           createdAt: Date.now(), timestamp: getConsistentTimestamp() 
         };
         const newVacs = [newVacancy, ...vacancies];
-        setVacancies(newVacs); setVacancyForm({ branchCode: '', position: '', manualStatus: 'Vacant' });
+        setVacancies(newVacs); setVacancyForm({ branchCode: '', position: '', manualStatus: 'Vacant', effectiveDate: '' });
         syncToCloud(applicants, newVacs);
         
         if (GOOGLE_SCRIPT_URL && cloudStatus === 'connected') {
@@ -421,6 +428,11 @@
       const startEditVac = (v) => { setEditVacId(v.id); setEditVacForm({ ...v }); };
       
       const saveEditVac = () => {
+        if (editVacForm.manualStatus === 'Promote&Transfer Done' && !editVacForm.effectiveDate) { 
+          alert('กรุณาระบุวันที่มีผล (Effective Date) สำหรับสถานะ Promote&Transfer Done'); 
+          return; 
+        }
+
         const isDuplicate = vacancies.some(v => String(v.id) !== String(editVacId) && String(v.branchCode) === String(editVacForm.branchCode) && String(v.position) === String(editVacForm.position) && v.manualStatus !== 'Closed');
         if (isDuplicate) { alert(`มีตำแหน่งนี้เปิดรับอยู่แล้ว!`); return; }
         const branch = appBranches.find(b => String(b.code) === String(editVacForm.branchCode));
@@ -578,6 +590,9 @@
                         <select required name="manualStatus" value={vacancyForm.manualStatus} onChange={handleVacancyInputChange} className="w-full border rounded-xl px-4 py-2.5 outline-none focus:border-blue-500">
                           {VACANCY_STATUSES.filter(s => s !== 'Closed').map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
+                        {vacancyForm.manualStatus === 'Promote&Transfer Done' && (
+                          <input required type="date" name="effectiveDate" value={vacancyForm.effectiveDate || ''} onChange={handleVacancyInputChange} className="w-full border rounded-xl px-4 py-2.5 outline-none focus:border-emerald-500 border-emerald-300 bg-emerald-50" title="วันที่มีผล" />
+                        )}
                       </div>
                       <div className="flex justify-end">
                         <button type="submit" className="bg-slate-800 text-white py-2.5 px-6 rounded-xl flex items-center space-x-2">
@@ -626,9 +641,12 @@
                                   <td className="p-3 text-center">-</td>
                                   <td className="p-3 text-center">-</td>
                                   <td className="p-3">
-                                    <select value={editVacForm.manualStatus} onChange={e=>setEditVacForm({...editVacForm, manualStatus:e.target.value})} className="w-full border p-1.5 rounded">
+                                    <select value={editVacForm.manualStatus} onChange={e=>setEditVacForm({...editVacForm, manualStatus:e.target.value})} className="w-full border p-1.5 rounded outline-none focus:border-blue-500">
                                       {VACANCY_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
                                     </select>
+                                    {editVacForm.manualStatus === 'Promote&Transfer Done' && (
+                                      <input type="date" value={editVacForm.effectiveDate || ''} onChange={e=>setEditVacForm({...editVacForm, effectiveDate:e.target.value})} className="w-full border border-emerald-400 bg-emerald-50 p-1.5 rounded mt-1.5 text-xs outline-none focus:border-emerald-600" title="วันที่มีผล" />
+                                    )}
                                   </td>
                                   <td className="p-3 text-right">
                                     <button onClick={saveEditVac} className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded text-xs mr-2">บันทึก</button>
@@ -656,9 +674,12 @@
                                   </button>
                                 </td>
                                 <td className="px-5 py-4">
-                                  <span className="px-2.5 py-1 rounded-full text-xs font-bold" style={{backgroundColor:VACANCY_COLORS[computedStatus]+'15', color:VACANCY_COLORS[computedStatus]}}>
+                                  <span className="px-2.5 py-1 rounded-full text-xs font-bold inline-block" style={{backgroundColor:VACANCY_COLORS[computedStatus]+'15', color:VACANCY_COLORS[computedStatus]}}>
                                     {computedStatus}
                                   </span>
+                                  {computedStatus === 'Promote&Transfer Done' && v.effectiveDate && (
+                                    <div className="text-[10px] text-emerald-600 mt-1.5 font-bold">วันที่มีผล: {new Date(v.effectiveDate).toLocaleDateString('th')}</div>
+                                  )}
                                 </td>
                                 <td className="px-5 py-4 text-right space-x-2">
                                   <button onClick={()=>startEditVac(v)} className="p-1.5 text-slate-400 hover:text-blue-600"><Edit size={16}/></button>
