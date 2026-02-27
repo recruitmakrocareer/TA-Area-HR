@@ -455,6 +455,14 @@
         return areaMatch && positionMatch;
       });
 
+      // ดึงเฉพาะตำแหน่งงานที่มีการเปิดรับอยู่จริง (สำหรับทำตัวเลือกใน Dropdown Filter)
+      const availableVacancyPositions = useMemo(() => {
+        // กรองหาเฉพาะงานใน Area ที่เลือกไว้ก่อน
+        const vacsInAreas = vacancies.filter(v => selectedAreas.length === 0 || selectedAreas.includes(v.area));
+        // ดึงเอาเฉพาะชื่อตำแหน่งที่ซ้ำกันออก แล้วเรียงลำดับ
+        return [...new Set(vacsInAreas.map(v => v.position))].sort();
+      }, [vacancies, selectedAreas]);
+
       const getVacancyInsights = (v) => {
         const matchedApplicants = applicants.filter(app => String(app.branchCode) === String(v.branchCode) && String(app.position) === String(v.position));
         const applicantCount = matchedApplicants.length;
@@ -626,7 +634,7 @@
                              className="w-full pl-9 pr-4 py-2.5 border rounded-lg text-sm outline-none focus:border-blue-500 bg-slate-50 hover:bg-slate-100 transition-colors appearance-none font-medium text-slate-700"
                            >
                              <option value="">ทุกตำแหน่งงาน</option>
-                             {uniquePositionNames.map(pos => (
+                             {availableVacancyPositions.map(pos => (
                                <option key={pos} value={pos}>{pos}</option>
                              ))}
                            </select>
