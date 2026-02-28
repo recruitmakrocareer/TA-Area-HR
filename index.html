@@ -557,6 +557,52 @@
         });
       }, [vacancies, recruitAreaFilter, recruitBranchFilter, appPositions, selectedTA]);
 
+      // สร้าง Dashboard Vacancies (สำหรับการคำนวณ Vacancy Overview ใน Dashboard)
+      const dashboardVacancies = useMemo(() => {
+        let activeVacs = vacancies.filter(v => v.manualStatus !== 'Closed');
+        if (dashboardTA !== 'ALL') {
+          const currentTA = String(dashboardTA).trim().toLowerCase();
+          activeVacs = activeVacs.filter(v => {
+            const vacPos = String(v.position).trim();
+            const vacArea = String(v.area).trim().toLowerCase();
+            const posRules = appPositions.filter(p => String(p.position).trim() === vacPos);
+            if (posRules.length > 0) {
+              let matchingRule = posRules.find(p => {
+                if (!p.area || String(p.area).trim() === '') return false;
+                return String(p.area).split(',').map(a => a.trim().toLowerCase()).includes(vacArea);
+              });
+              if (!matchingRule) matchingRule = posRules.find(p => !p.area || String(p.area).trim() === '');
+              if (matchingRule) {
+                const assignedRecruit = String(matchingRule.recruit).trim().toLowerCase();
+                if (assignedRecruit !== '' && assignedRecruit !== currentTA) return false;
+              }
+            }
+            return true;
+          });
+        }
+        return activeVacs;
+      }, [vacancies, dashboardTA, appPositions]);
+
+      const vacancyStats = useMemo(() => {
+        let total = dashboardVacancies.length;
+        let vacant = 0;
+        let promoteTransfer = 0;
+        let hold = 0;
+        let fulfilled = 0;
+
+        dashboardVacancies.forEach(v => {
+          const { computedStatus } = getVacancyInsights(v);
+          if (computedStatus === 'Vacant') vacant++;
+          else if (computedStatus === 'Promote&Transfer') promoteTransfer++;
+          else if (computedStatus === 'Hold') hold++;
+          else if (['Hired', 'Waiting to Join', 'Promote&Transfer Done'].includes(computedStatus)) fulfilled++;
+        });
+
+        const progress = total > 0 ? Math.round((fulfilled / total) * 100) : 0;
+
+        return { total, vacant, promoteTransfer, hold, fulfilled, progress };
+      }, [dashboardVacancies, applicants]); 
+
       const branchesForRecruitFilter = appBranches.filter(b => !recruitAreaFilter || String(b.area) === String(recruitAreaFilter));
       const myApplicants = applicants.filter(app => String(app.ta) === String(selectedTA));
       const dashboardData = useMemo(() => dashboardTA === 'ALL' ? applicants : applicants.filter(app => String(app.ta) === String(dashboardTA)), [applicants, dashboardTA]);
@@ -969,47 +1015,83 @@
                   </select>
                 </div>
 
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                   <div className="bg-white p-5 rounded-2xl border shadow-sm hover:shadow-md transition-shadow">
-                     <div className="text-sm text-slate-500 font-bold mb-2 flex items-center space-x-1"><Users size={16}/><span>รวมผู้สมัคร</span></div>
-                     <div className="text-3xl font-black text-slate-800">{dashboardData.length}</div>
-                   </div>
-                   <div className="bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm hover:shadow-md transition-shadow">
-                     <div className="text-sm text-emerald-600 font-bold mb-2 flex items-center space-x-1"><CheckCircle2 size={16}/><span>สำเร็จ (Hired)</span></div>
-                     <div className="text-3xl font-black text-emerald-600">
-                       {dashboardData.filter(a => {
-                         if (a.status === 'ผ่านสัมภาษณ์') return true;
-                         if (a.status === 'รอเริ่มงาน' && a.startDate) {
-                           const sDate = new Date(a.startDate).setHours(0,0,0,0);
-                           const today = new Date().setHours(0,0,0,0);
-                           return today >= sDate;
-                         }
-                         return false;
-                       }).length}
+                {/* Vacancy Overview */}
+                <div>
+                  <h3 className="text-lg font-bold mb-4 text-slate-700 flex items-center"><Briefcase className="mr-2" size={20}/> ภาพรวมตำแหน่งงาน (Vacancy Overview)</h3>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                     <div className="bg-white p-5 rounded-2xl border shadow-sm hover:shadow-md transition-shadow">
+                       <div className="text-sm text-slate-500 font-bold mb-2">เปิดรับทั้งหมด (Active)</div>
+                       <div className="text-3xl font-black text-slate-800">{vacancyStats.total}</div>
                      </div>
-                   </div>
-                   <div className="bg-white p-5 rounded-2xl border border-amber-100 shadow-sm hover:shadow-md transition-shadow">
-                     <div className="text-sm text-amber-600 font-bold mb-2 flex items-center space-x-1"><Clock size={16}/><span>รอดำเนินการ</span></div>
-                     <div className="text-3xl font-black text-amber-600">
-                       {dashboardData.filter(a => {
-                         if (['รอพิจารณาประวัติ', 'รอผลสัมภาษณ์', 'อยู่ระหว่างนัดสัมภาษณ์', 'สำรอง/เก็บไว้พิจารณา', 'ตรวจสุขภาพ'].includes(a.status)) return true;
-                         if (a.status === 'รอเริ่มงาน') {
-                           if (!a.startDate) return true;
-                           const sDate = new Date(a.startDate).setHours(0,0,0,0);
-                           const today = new Date().setHours(0,0,0,0);
-                           return today < sDate;
-                         }
-                         return false;
-                       }).length}
+                     <div className="bg-white p-5 rounded-2xl border border-amber-100 shadow-sm hover:shadow-md transition-shadow">
+                       <div className="text-sm text-amber-600 font-bold mb-2">ว่าง (Vacant)</div>
+                       <div className="text-3xl font-black text-amber-600">{vacancyStats.vacant}</div>
                      </div>
-                   </div>
-                   <div className="bg-white p-5 rounded-2xl border border-red-100 shadow-sm hover:shadow-md transition-shadow">
-                     <div className="text-sm text-red-600 font-bold mb-2 flex items-center space-x-1"><AlertCircle size={16}/><span>ไม่ผ่าน/ปฏิเสธ</span></div>
-                     <div className="text-3xl font-black text-red-600">{dashboardData.filter(a=>['ติดต่อผู้สมัครไม่ได้', 'ยกเลิกสัมภาษณ์/ไม่มาตามนัด', 'ไม่ผ่านสัมภาษณ์', 'ไม่มีตำแหน่งงานว่าง'].includes(a.status)).length}</div>
-                   </div>
+                     <div className="bg-white p-5 rounded-2xl border border-purple-100 shadow-sm hover:shadow-md transition-shadow">
+                       <div className="text-sm text-purple-600 font-bold mb-2">Promote & Transfer</div>
+                       <div className="text-3xl font-black text-purple-600">{vacancyStats.promoteTransfer}</div>
+                     </div>
+                     <div className="bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm hover:shadow-md transition-shadow bg-gradient-to-br from-emerald-50 to-white flex flex-col justify-center">
+                       <div className="flex justify-between items-end mb-2">
+                         <div className="text-sm text-emerald-700 font-bold">Progress (ได้คนแล้ว)</div>
+                         <div className="text-sm text-emerald-600 font-bold">{vacancyStats.fulfilled}/{vacancyStats.total}</div>
+                       </div>
+                       <div className="flex items-end space-x-2">
+                         <div className="text-3xl font-black text-emerald-600">{vacancyStats.progress}%</div>
+                       </div>
+                       <div className="w-full bg-emerald-200 rounded-full h-1.5 mt-2 overflow-hidden">
+                         <div className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${vacancyStats.progress}%` }}></div>
+                       </div>
+                     </div>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Applicant Overview */}
+                <div>
+                  <h3 className="text-lg font-bold mb-4 mt-6 text-slate-700 flex items-center"><Users className="mr-2" size={20}/> ภาพรวมผู้สมัคร (Applicant Overview)</h3>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                     <div className="bg-white p-5 rounded-2xl border shadow-sm hover:shadow-md transition-shadow">
+                       <div className="text-sm text-slate-500 font-bold mb-2 flex items-center space-x-1"><span>รวมผู้สมัคร</span></div>
+                       <div className="text-3xl font-black text-slate-800">{dashboardData.length}</div>
+                     </div>
+                     <div className="bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm hover:shadow-md transition-shadow">
+                       <div className="text-sm text-emerald-600 font-bold mb-2 flex items-center space-x-1"><CheckCircle2 size={16}/><span>สำเร็จ (Hired)</span></div>
+                       <div className="text-3xl font-black text-emerald-600">
+                         {dashboardData.filter(a => {
+                           if (a.status === 'ผ่านสัมภาษณ์') return true;
+                           if (a.status === 'รอเริ่มงาน' && a.startDate) {
+                             const sDate = new Date(a.startDate).setHours(0,0,0,0);
+                             const today = new Date().setHours(0,0,0,0);
+                             return today >= sDate;
+                           }
+                           return false;
+                         }).length}
+                       </div>
+                     </div>
+                     <div className="bg-white p-5 rounded-2xl border border-amber-100 shadow-sm hover:shadow-md transition-shadow">
+                       <div className="text-sm text-amber-600 font-bold mb-2 flex items-center space-x-1"><Clock size={16}/><span>รอดำเนินการ</span></div>
+                       <div className="text-3xl font-black text-amber-600">
+                         {dashboardData.filter(a => {
+                           if (['รอพิจารณาประวัติ', 'รอผลสัมภาษณ์', 'อยู่ระหว่างนัดสัมภาษณ์', 'สำรอง/เก็บไว้พิจารณา', 'ตรวจสุขภาพ'].includes(a.status)) return true;
+                           if (a.status === 'รอเริ่มงาน') {
+                             if (!a.startDate) return true;
+                             const sDate = new Date(a.startDate).setHours(0,0,0,0);
+                             const today = new Date().setHours(0,0,0,0);
+                             return today < sDate;
+                           }
+                           return false;
+                         }).length}
+                       </div>
+                     </div>
+                     <div className="bg-white p-5 rounded-2xl border border-red-100 shadow-sm hover:shadow-md transition-shadow">
+                       <div className="text-sm text-red-600 font-bold mb-2 flex items-center space-x-1"><AlertCircle size={16}/><span>ไม่ผ่าน/ปฏิเสธ</span></div>
+                       <div className="text-3xl font-black text-red-600">{dashboardData.filter(a=>['ติดต่อผู้สมัครไม่ได้', 'ยกเลิกสัมภาษณ์/ไม่มาตามนัด', 'ไม่ผ่านสัมภาษณ์', 'ไม่มีตำแหน่งงานว่าง'].includes(a.status)).length}</div>
+                     </div>
+                  </div>
+                </div>
+
+                {/* Charts */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-2">
                    <div className="bg-white p-6 rounded-3xl border shadow-sm h-[350px]">
                       <h3 className="font-bold mb-4 flex items-center"><Building2 className="mr-2 text-slate-400" size={18}/>แหล่งที่มาแยกตามสาขา</h3>
                       <ResponsiveContainer width="100%" height="100%">
