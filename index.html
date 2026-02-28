@@ -27,6 +27,7 @@
   <script type="text/babel" data-type="module">
     import React, { useState, useMemo, useEffect } from 'https://esm.sh/react@18.2.0';
     import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
+    import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'https://esm.sh/recharts@2.12.0?deps=react@18.2.0,react-dom@18.2.0';
     import { Users, UserPlus, BarChart3, Building2, CheckCircle2, Clock, MapPin, Search, AlertCircle, FileText, Briefcase, Phone, MessageSquare, Map, Target, Edit, Trash2, X, BellRing, Download, Paperclip, Upload, Eye, PlusCircle, Settings, Check, Filter } from 'https://esm.sh/lucide-react@0.344.0?deps=react@18.2.0';
 
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzM4EXsW141-nqY7rRwU_MFc9vnrJSbK-8Wdwn-ZJwvfEBlNMZJH2dhE0r2C4uJf7mnxg/exec"; 
@@ -173,8 +174,15 @@
               
               if (data.applicants) loadedApps = data.applicants.map(a => ({...a, id: String(a.id), branchCode: String(a.branchCode).padStart(3, '0')}));
               if (data.vacancies) loadedVacs = data.vacancies.map(v => ({...v, id: String(v.id), branchCode: String(v.branchCode).padStart(3, '0')}));
-              if (data.branches && data.branches.length > 0) setAppBranches(data.branches.map(b => ({...b, code: String(b.code).padStart(3, '0')})));
-              else setAppBranches(DEFAULT_BRANCHES);
+              if (data.branches && data.branches.length > 0) {
+                  setAppBranches(data.branches.map(b => ({
+                      ...b, 
+                      code: String(b.code).padStart(3, '0'),
+                      name: String(b.name).trim() === 'Ma' ? 'สาขาศาลายา' : String(b.name).trim()
+                  })));
+              } else {
+                  setAppBranches(DEFAULT_BRANCHES);
+              }
               if (data.tas && data.tas.length > 0) setAppTAs(data.tas.map(t => String(t.name || t)));
               else setAppTAs(DEFAULT_TAS);
               if (data.positions && data.positions.length > 0) setAppPositions(normalizePositions(data.positions));
@@ -188,7 +196,14 @@
             if (localApps) loadedApps = JSON.parse(localApps);
             if (localVacs) loadedVacs = JSON.parse(localVacs);
             const localBranches = localStorage.getItem('hr_branches');
-            if (localBranches) { try { setAppBranches(JSON.parse(localBranches)); } catch(err) {} }
+            if (localBranches) { 
+                try { 
+                    setAppBranches(JSON.parse(localBranches).map(b => ({
+                        ...b,
+                        name: String(b.name).trim() === 'Ma' ? 'สาขาศาลายา' : String(b.name).trim()
+                    }))); 
+                } catch(err) {} 
+            }
             else setAppBranches(DEFAULT_BRANCHES);
             const localTAs = localStorage.getItem('hr_tas');
             if (localTAs) { try { setAppTAs(JSON.parse(localTAs)); } catch(e) {} }
@@ -261,7 +276,9 @@
             const newBranches = [];
             for (let i = 1; i < data.length; i++) {
               if (data[i] && data[i][0] && data[i][1] && data[i][2]) {
-                newBranches.push({ code: String(data[i][0]).padStart(3, '0'), name: String(data[i][1]).replace(/\n|\r/g, '').trim(), area: String(data[i][2]).replace(/\r/g, '').trim() });
+                let rawName = String(data[i][1]).replace(/\n|\r/g, '').trim();
+                let finalName = rawName === 'Ma' ? 'สาขาศาลายา' : rawName;
+                newBranches.push({ code: String(data[i][0]).padStart(3, '0'), name: finalName, area: String(data[i][2]).replace(/\r/g, '').trim() });
               }
             }
             if (newBranches.length > 0) {
@@ -413,8 +430,10 @@
 
         const branch = appBranches.find(b => String(b.code) === String(vacancyForm.branchCode));
         if (!branch) { alert('ไม่พบข้อมูลสาขาในระบบ'); return; }
-        const isDuplicate = vacancies.some(v => String(v.branchCode) === String(branch.code) && String(v.position) === String(vacancyForm.position) && v.manualStatus !== 'Closed');
-        if (isDuplicate) { alert(`มีตำแหน่งเปิดรับอยู่แล้ว!`); return; }
+
+        // อนุญาตให้เปิดรับตำแหน่งเดิมในสาขาเดิมซ้ำกันได้ตามคำขอ (เช่นรับ 2 คน)
+        // const isDuplicate = vacancies.some(v => String(v.branchCode) === String(branch.code) && String(v.position) === String(vacancyForm.position) && v.manualStatus !== 'Closed');
+        // if (isDuplicate) { alert(`มีตำแหน่งเปิดรับอยู่แล้ว!`); return; }
 
         const newVacancy = { 
           id: Date.now().toString(), area: branch.area, branchCode: String(branch.code).padStart(3, '0'), 
@@ -450,8 +469,10 @@
           return; 
         }
 
-        const isDuplicate = vacancies.some(v => String(v.id) !== String(editVacId) && String(v.branchCode) === String(editVacForm.branchCode) && String(v.position) === String(editVacForm.position) && v.manualStatus !== 'Closed');
-        if (isDuplicate) { alert(`มีตำแหน่งนี้เปิดรับอยู่แล้ว!`); return; }
+        // อนุญาตให้บันทึกเป็นตำแหน่งที่ซ้ำได้ตามเงื่อนไขใหม่
+        // const isDuplicate = vacancies.some(v => String(v.id) !== String(editVacId) && String(v.branchCode) === String(editVacForm.branchCode) && String(v.position) === String(editVacForm.position) && v.manualStatus !== 'Closed');
+        // if (isDuplicate) { alert(`มีตำแหน่งนี้เปิดรับอยู่แล้ว!`); return; }
+
         const branch = appBranches.find(b => String(b.code) === String(editVacForm.branchCode));
         const newVacs = vacancies.map(v => String(v.id) === String(editVacId) ? { ...editVacForm, area: branch ? branch.area : v.area, branchName: branch ? branch.name : v.branchName } : v);
         setVacancies(newVacs); setEditVacId(null); syncToCloud(applicants, newVacs);
