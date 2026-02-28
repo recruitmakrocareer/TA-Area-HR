@@ -593,10 +593,16 @@
 
         dashboardVacancies.forEach(v => {
           const { computedStatus } = getVacancyInsights(v);
-          if (computedStatus === 'Vacant') vacant++;
-          else if (computedStatus === 'Promote&Transfer') promoteTransfer++;
-          else if (computedStatus === 'Hold') hold++;
-          else if (['Hired', 'Waiting to Join', 'Promote&Transfer Done'].includes(computedStatus)) fulfilled++;
+          if (computedStatus === 'Vacant') {
+            vacant++;
+          } else if (computedStatus === 'Promote&Transfer') {
+            promoteTransfer++;
+            fulfilled++; // นำมานับรวมใน Progress ตามเงื่อนไขใหม่
+          } else if (computedStatus === 'Hold') {
+            hold++;
+          } else if (['Hired', 'Waiting to Join', 'Promote&Transfer Done'].includes(computedStatus)) {
+            fulfilled++;
+          }
         });
 
         const progress = total > 0 ? Math.round((fulfilled / total) * 100) : 0;
@@ -637,7 +643,8 @@
             if (filterMode === 'all') return true;
             if (filterMode === 'vacant') return v.insight.computedStatus === 'Vacant';
             if (filterMode === 'promote') return v.insight.computedStatus === 'Promote&Transfer';
-            if (filterMode === 'fulfilled') return ['Hired', 'Waiting to Join', 'Promote&Transfer Done'].includes(v.insight.computedStatus);
+            // นำ Promote&Transfer มารวมในหน้าต่าง fulfilled (Progress) ด้วยตามเงื่อนไขใหม่
+            if (filterMode === 'fulfilled') return ['Hired', 'Waiting to Join', 'Promote&Transfer Done', 'Promote&Transfer'].includes(v.insight.computedStatus);
             return true;
           });
         } else if (type === 'applicant') {
