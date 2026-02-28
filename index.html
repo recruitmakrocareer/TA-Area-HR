@@ -27,7 +27,6 @@
   <script type="text/babel" data-type="module">
     import React, { useState, useMemo, useEffect } from 'https://esm.sh/react@18.2.0';
     import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
-    import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'https://esm.sh/recharts@2.12.0?deps=react@18.2.0,react-dom@18.2.0';
     import { Users, UserPlus, BarChart3, Building2, CheckCircle2, Clock, MapPin, Search, AlertCircle, FileText, Briefcase, Phone, MessageSquare, Map, Target, Edit, Trash2, X, BellRing, Download, Paperclip, Upload, Eye, PlusCircle, Settings, Check, Filter } from 'https://esm.sh/lucide-react@0.344.0?deps=react@18.2.0';
 
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzM4EXsW141-nqY7rRwU_MFc9vnrJSbK-8Wdwn-ZJwvfEBlNMZJH2dhE0r2C4uJf7mnxg/exec"; 
@@ -47,7 +46,6 @@
       { code: '004', name: 'สาขาบางบอน', area: 'Area 1' }
     ];
 
-    // เพิ่มสถานะ รอพิจารณาประวัติ เป็นอันดับแรก
     const STATUSES = ['รอพิจารณาประวัติ', 'ผ่านสัมภาษณ์', 'รอผลสัมภาษณ์', 'ติดต่อผู้สมัครไม่ได้', 'อยู่ระหว่างนัดสัมภาษณ์', 'ยกเลิกสัมภาษณ์/ไม่มาตามนัด', 'ไม่ผ่านสัมภาษณ์', 'ไม่มีตำแหน่งงานว่าง', 'สำรอง/เก็บไว้พิจารณา', 'ตรวจสุขภาพ', 'รอเริ่มงาน', 'อื่นๆ'];
     const VACANCY_STATUSES = ['Vacant', 'Promote&Transfer', 'Promote&Transfer Done', 'Hold', 'Closed'];
 
@@ -66,7 +64,6 @@
       'อื่นๆ': '#F97316' 
     };
     
-    // อัปเดตสีสถานะสำหรับ Area HR
     const VACANCY_COLORS = { 
       'Vacant': '#F59E0B', 
       'Promote&Transfer': '#8B5CF6', 
@@ -140,9 +137,13 @@
       const [vacancies, setVacancies] = useState([]);
       const [editVacId, setEditVacId] = useState(null);
       const [editVacForm, setEditVacForm] = useState({});
+      
+      // Dashboard States
       const [dashboardTA, setDashboardTA] = useState('ALL');
       const [vacancyPositionFilter, setVacancyPositionFilter] = useState('');
-      const [dashboardDetailModal, setDashboardDetailModal] = useState(null); // State สำหรับ Modal ในหน้า Dashboard
+      const [dashboardDetailModal, setDashboardDetailModal] = useState(null);
+      const [dashboardAreaFilter, setDashboardAreaFilter] = useState('');
+      const [dashboardBranchFilter, setDashboardBranchFilter] = useState('');
 
       const uniquePositionNames = useMemo(() => [...new Set(appPositions.map(p => p.position))], [appPositions]);
 
@@ -344,7 +345,6 @@
         e.preventDefault();
         if (!selectedTA || !addingApplicantFor) return;
 
-        // บังคับกรอกวันที่เริ่มงาน
         if (formData.status === 'รอเริ่มงาน' && !formData.startDate) { 
           alert('กรุณาระบุวันที่เริ่มงาน'); 
           return; 
@@ -371,12 +371,10 @@
       const startEditApp = (app) => { setEditAppId(app.id); setEditAppForm({ ...app }); };
       
       const saveEditApp = () => {
-        // บังคับกรอกเหตุผลสำหรับสถานะเชิงปฏิเสธ
         if (['อื่นๆ', 'ติดต่อผู้สมัครไม่ได้', 'ยกเลิกสัมภาษณ์/ไม่มาตามนัด', 'ไม่ผ่านสัมภาษณ์', 'ไม่มีตำแหน่งงานว่าง'].includes(editAppForm.status) && !editAppForm.comment) { 
           alert('กรุณาระบุเหตุผล'); 
           return; 
         }
-        // บังคับกรอกวันที่เริ่มงานสำหรับสถานะรอเริ่มงาน
         if (editAppForm.status === 'รอเริ่มงาน' && !editAppForm.startDate) { 
           alert('กรุณาระบุวันที่เริ่มงาน'); 
           return; 
@@ -389,7 +387,6 @@
       };
 
       const handleInlineStatusChange = (app, newStatus) => {
-        // ให้เด้ง Modal Edit ถ้าระบุสถานะที่ต้องการข้อมูลเพิ่มเติม (รวมถึง รอเริ่มงาน ที่ต้องใส่วันที่)
         if (['อื่นๆ', 'ติดต่อผู้สมัครไม่ได้', 'ยกเลิกสัมภาษณ์/ไม่มาตามนัด', 'ไม่ผ่านสัมภาษณ์', 'ไม่มีตำแหน่งงานว่าง', 'รอเริ่มงาน'].includes(newStatus)) {
           startEditApp({ ...app, status: newStatus });
         } else {
@@ -478,7 +475,6 @@
         return [...new Set(vacsInAreas.map(v => v.position))].sort();
       }, [vacancies, selectedAreas]);
 
-      // คำนวณ Insights และตรรกะผูกวันที่เริ่มงานกับสถานะ Hired / Waiting to Join
       const getVacancyInsights = (v) => {
         const matchedApplicants = applicants.filter(app => String(app.branchCode) === String(v.branchCode) && String(app.position) === String(v.position));
         const applicantCount = matchedApplicants.length;
@@ -494,16 +490,14 @@
 
           matchedApplicants.forEach(app => {
             if (app.status === 'ผ่านสัมภาษณ์') hasHired = true;
-            
-            // ตรรกะเช็ควันที่เริ่มงาน
             if (app.status === 'รอเริ่มงาน') {
               if (app.startDate) {
                 const sDate = new Date(app.startDate);
                 sDate.setHours(0,0,0,0);
                 if (today >= sDate) {
-                  hasHired = true; // ถึงวันแล้ว ถือว่า Hired
+                  hasHired = true;
                 } else {
-                  hasWaitingToJoin = true; // ยังไม่ถึงวัน ถือว่า Waiting to Join
+                  hasWaitingToJoin = true; 
                 }
               } else {
                 hasWaitingToJoin = true;
@@ -518,7 +512,6 @@
         }
         
         let slaEndTime = Date.now();
-        // หยุดนับ SLA เมื่อสถานะเปลี่ยนเป็น ผ่านสัมภาษณ์ หรือ รอเริ่มงาน (ไม่ต้องรอให้ถึงวันที่เริ่มงานจริง)
         const hiredApps = matchedApplicants.filter(app => {
           return ['ผ่านสัมภาษณ์', 'รอเริ่มงาน'].includes(app.status);
         });
@@ -558,7 +551,6 @@
         });
       }, [vacancies, recruitAreaFilter, recruitBranchFilter, appPositions, selectedTA]);
 
-      // สร้าง Dashboard Vacancies (สำหรับการคำนวณ Vacancy Overview ใน Dashboard)
       const dashboardVacancies = useMemo(() => {
         let activeVacs = vacancies.filter(v => v.manualStatus !== 'Closed');
         if (dashboardTA !== 'ALL') {
@@ -597,7 +589,7 @@
             vacant++;
           } else if (computedStatus === 'Promote&Transfer') {
             promoteTransfer++;
-            fulfilled++; // นำมานับรวมใน Progress ตามเงื่อนไขใหม่
+            fulfilled++; // นำมานับรวมใน Progress
           } else if (computedStatus === 'Hold') {
             hold++;
           } else if (['Hired', 'Waiting to Join', 'Promote&Transfer Done'].includes(computedStatus)) {
@@ -611,44 +603,127 @@
       }, [dashboardVacancies, applicants]); 
 
       const branchesForRecruitFilter = appBranches.filter(b => !recruitAreaFilter || String(b.area) === String(recruitAreaFilter));
+      const dashboardBranchesForFilter = appBranches.filter(b => !dashboardAreaFilter || String(b.area) === String(dashboardAreaFilter));
+      
       const myApplicants = applicants.filter(app => String(app.ta) === String(selectedTA));
       const dashboardData = useMemo(() => dashboardTA === 'ALL' ? applicants : applicants.filter(app => String(app.ta) === String(dashboardTA)), [applicants, dashboardTA]);
       
-      const statusChartData = useMemo(() => {
-        const counts = {}; dashboardData.forEach(app => counts[app.status] = (counts[app.status] || 0) + 1);
-        return Object.keys(counts).map(key => ({ name: key, value: counts[key] })).sort((a, b) => b.value - a.value);
-      }, [dashboardData]);
-      
-      const branchChartData = useMemo(() => {
-        const counts = {}; dashboardData.forEach(app => counts[app.branchName] = (counts[app.branchName] || 0) + 1);
-        return Object.keys(counts).map(key => ({ name: key, count: counts[key] })).sort((a, b) => b.count - a.count);
-      }, [dashboardData]);
+      // การดึงข้อมูลเพื่อมาแสดงในตาราง "Progress รายสาขา"
+      const branchProgressData = useMemo(() => {
+        let filteredVacs = dashboardVacancies;
+        if (dashboardAreaFilter) filteredVacs = filteredVacs.filter(v => v.area === dashboardAreaFilter);
+        if (dashboardBranchFilter) filteredVacs = filteredVacs.filter(v => v.branchCode === dashboardBranchFilter);
 
-      const slaChartData = useMemo(() => {
-        const buckets = [ { name: '0-14 วัน', count: 0, fill: '#10B981' }, { name: '15-30 วัน', count: 0, fill: '#F59E0B' }, { name: '31-45 วัน', count: 0, fill: '#F97316' }, { name: 'เกิน 45 วัน', count: 0, fill: '#EF4444' } ];
-        vacancies.forEach(v => {
-          if (v.manualStatus !== 'Closed') {
-            const { slaDays } = getVacancyInsights(v);
-            if (slaDays <= 14) buckets[0].count++; else if (slaDays <= 30) buckets[1].count++; else if (slaDays <= 45) buckets[2].count++; else buckets[3].count++;
-          }
+        let filteredApps = dashboardData;
+        if (dashboardAreaFilter) {
+            filteredApps = filteredApps.filter(a => {
+                const b = appBranches.find(br => String(br.code) === String(a.branchCode));
+                return b && b.area === dashboardAreaFilter;
+            });
+        }
+        if (dashboardBranchFilter) {
+            filteredApps = filteredApps.filter(a => String(a.branchCode) === String(dashboardBranchFilter));
+        }
+
+        const branchMap = {};
+
+        filteredVacs.forEach(v => {
+            if (!branchMap[v.branchCode]) {
+                branchMap[v.branchCode] = {
+                    branchCode: v.branchCode,
+                    branchName: v.branchName,
+                    area: v.area,
+                    totalVacancies: 0,
+                    fulfilledVacancies: 0,
+                    applicantCount: 0
+                };
+            }
+            branchMap[v.branchCode].totalVacancies++;
+            
+            const matchedApps = filteredApps.filter(app => String(app.branchCode) === String(v.branchCode) && String(app.position) === String(v.position));
+            let computedStatus = v.manualStatus;
+            
+            if (v.manualStatus !== 'Closed') {
+                let hasHired = false;
+                let hasWaitingToJoin = false;
+                
+                const today = new Date();
+                today.setHours(0,0,0,0);
+
+                matchedApps.forEach(app => {
+                    if (app.status === 'ผ่านสัมภาษณ์') hasHired = true;
+                    if (app.status === 'รอเริ่มงาน') {
+                        if (app.startDate) {
+                            const sDate = new Date(app.startDate);
+                            sDate.setHours(0,0,0,0);
+                            if (today >= sDate) hasHired = true;
+                            else hasWaitingToJoin = true;
+                        } else {
+                            hasWaitingToJoin = true;
+                        }
+                    }
+                });
+
+                if (hasHired) computedStatus = 'Hired';
+                else if (hasWaitingToJoin) computedStatus = 'Waiting to Join';
+            }
+
+            if (['Hired', 'Waiting to Join', 'Promote&Transfer Done', 'Promote&Transfer'].includes(computedStatus)) {
+                branchMap[v.branchCode].fulfilledVacancies++;
+            }
         });
-        return buckets;
-      }, [vacancies, applicants]); 
 
-      // ฟังก์ชันสำหรับเปิด Dashboard Detail Modal
-      const handleShowDashboardDetail = (title, type, filterMode) => {
+        filteredApps.forEach(a => {
+            if (!branchMap[a.branchCode]) {
+                const b = appBranches.find(br => String(br.code) === String(a.branchCode));
+                branchMap[a.branchCode] = {
+                    branchCode: a.branchCode,
+                    branchName: a.branchName || (b ? b.name : a.branchCode),
+                    area: b ? b.area : 'Unknown',
+                    totalVacancies: 0,
+                    fulfilledVacancies: 0,
+                    applicantCount: 0
+                };
+            }
+            branchMap[a.branchCode].applicantCount++;
+        });
+
+        return Object.values(branchMap).sort((a, b) => {
+            // คำนวณ % Progress ของ a และ b สำหรับใช้เปรียบเทียบ
+            const progressA = a.totalVacancies > 0 ? (a.fulfilledVacancies / a.totalVacancies) : 0;
+            const progressB = b.totalVacancies > 0 ? (b.fulfilledVacancies / b.totalVacancies) : 0;
+            
+            // 1. เรียงจาก Progress มากไปน้อย
+            if (progressB !== progressA) {
+                return progressB - progressA;
+            }
+            // 2. ถ้า Progress เท่ากัน ให้เรียงตามจำนวนที่สำเร็จจริง (มากไปน้อย)
+            if (b.fulfilledVacancies !== a.fulfilledVacancies) {
+                return b.fulfilledVacancies - a.fulfilledVacancies;
+            }
+            // 3. ถ้ายังเท่ากันอีก ให้เรียงตามตัวอักษร Area และ สาขา
+            if (a.area !== b.area) return String(a.area).localeCompare(String(b.area));
+            return String(a.branchName).localeCompare(String(b.branchName));
+        });
+
+      }, [dashboardVacancies, dashboardData, dashboardAreaFilter, dashboardBranchFilter, appBranches]);
+
+      // แก้ไขฟังก์ชันให้รับ branchCode เพื่อกรองข้อมูลโชว์ใน Popup เฉพาะสาขาที่เลือก
+      const handleShowDashboardDetail = (title, type, filterMode, branchCode = null) => {
         let filteredData = [];
         if (type === 'vacancy') {
           filteredData = dashboardVacancies.map(v => ({...v, insight: getVacancyInsights(v)})).filter(v => {
+            if (branchCode && String(v.branchCode) !== String(branchCode)) return false;
             if (filterMode === 'all') return true;
             if (filterMode === 'vacant') return v.insight.computedStatus === 'Vacant';
             if (filterMode === 'promote') return v.insight.computedStatus === 'Promote&Transfer';
-            // นำ Promote&Transfer มารวมในหน้าต่าง fulfilled (Progress) ด้วยตามเงื่อนไขใหม่
+            // รวม Promote&Transfer ด้วย
             if (filterMode === 'fulfilled') return ['Hired', 'Waiting to Join', 'Promote&Transfer Done', 'Promote&Transfer'].includes(v.insight.computedStatus);
             return true;
           });
         } else if (type === 'applicant') {
           filteredData = dashboardData.filter(a => {
+            if (branchCode && String(a.branchCode) !== String(branchCode)) return false;
             if (filterMode === 'all') return true;
             if (filterMode === 'hired') {
               if (a.status === 'ผ่านสัมภาษณ์') return true;
@@ -1136,46 +1211,96 @@
                   </div>
                 </div>
 
-                {/* Charts */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-2">
-                   <div className="bg-white p-6 rounded-3xl border shadow-sm h-[350px]">
-                      <h3 className="font-bold mb-4 flex items-center"><Building2 className="mr-2 text-slate-400" size={18}/>แหล่งที่มาแยกตามสาขา</h3>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={branchChartData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
-                          <XAxis dataKey="name" tick={{fontSize: 10}} angle={-45} textAnchor="end" height={60}/>
-                          <YAxis tick={{fontSize: 10}} />
-                          <Bar dataKey="count" fill="#3B82F6" radius={[4, 4, 0, 0]} />
-                          <RechartsTooltip cursor={{fill: 'transparent'}} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                   </div>
-                   <div className="bg-white p-6 rounded-3xl border shadow-sm h-[350px]">
-                      <h3 className="font-bold mb-4 flex items-center"><PieChart className="mr-2 text-slate-400" size={18}/>สถานะผู้สมัคร</h3>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie data={statusChartData} innerRadius={70} outerRadius={100} dataKey="value" paddingAngle={2}>
-                            {statusChartData.map((e,i) => <Cell key={i} fill={STATUS_COLORS[e.name]||'#cbd5e1'}/>)}
-                          </Pie>
-                          <Legend wrapperStyle={{fontSize: '12px'}} />
-                          <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                   </div>
-                   <div className="bg-white p-6 rounded-3xl border shadow-sm lg:col-span-2 h-[350px]">
-                      <h3 className="font-bold mb-4 flex items-center"><Target className="mr-2 text-slate-400" size={18}/>Vacancy SLA Aging (อายุงานว่าง)</h3>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={slaChartData} margin={{ top: 20, right: 20, left: -20, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                          <XAxis dataKey="name" tick={{fontSize: 12}} />
-                          <YAxis tick={{fontSize: 12}} />
-                          <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                            {slaChartData.map((e,i) => <Cell key={i} fill={e.fill}/>)}
-                          </Bar>
-                          <RechartsTooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                   </div>
+                {/* Progress รายสาขา (Table replacing charts) */}
+                <div className="bg-white rounded-3xl shadow-sm border mt-6 overflow-hidden">
+                  <div className="p-6 border-b flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-50/50">
+                    <h3 className="font-bold text-lg flex items-center text-slate-700">
+                      <Building2 className="mr-2 text-blue-600" size={20}/> 
+                      Progress รายสาขา
+                    </h3>
+                    <div className="flex flex-col sm:flex-row items-center w-full md:w-auto gap-3">
+                      <select 
+                        value={dashboardAreaFilter} 
+                        onChange={(e) => { setDashboardAreaFilter(e.target.value); setDashboardBranchFilter(''); }}
+                        className="w-full sm:w-auto border rounded-xl px-4 py-2.5 text-sm outline-none focus:border-blue-500 bg-white font-medium text-slate-600"
+                      >
+                        <option value="">ทุก Area</option>
+                        {appAreas.map(a => <option key={a} value={a}>{a}</option>)}
+                      </select>
+                      <select 
+                        value={dashboardBranchFilter} 
+                        onChange={(e) => setDashboardBranchFilter(e.target.value)}
+                        disabled={!dashboardAreaFilter}
+                        className="w-full sm:w-auto border rounded-xl px-4 py-2.5 text-sm outline-none focus:border-blue-500 bg-white font-medium text-slate-600 disabled:bg-slate-100 disabled:text-slate-400"
+                      >
+                        <option value="">ทุกสาขา</option>
+                        {dashboardBranchesForFilter.map(b => <option key={b.code} value={b.code}>{b.name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto hide-scrollbar">
+                    <table className="w-full text-sm text-left whitespace-nowrap">
+                      <thead className="bg-white border-b text-slate-500">
+                        <tr>
+                          <th className="p-5 font-bold">Area</th>
+                          <th className="p-5 font-bold">สาขา</th>
+                          <th className="p-5 font-bold text-center">ตำแหน่งเปิดรับ</th>
+                          <th className="p-5 font-bold text-center">ผู้สมัครเข้าร่วม</th>
+                          <th className="p-5 font-bold min-w-[250px] xl:min-w-[350px]">ความคืบหน้า (Progress)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {branchProgressData.length > 0 ? branchProgressData.map((row, idx) => {
+                          const progressPct = row.totalVacancies > 0 ? Math.round((row.fulfilledVacancies / row.totalVacancies) * 100) : 0;
+                          return (
+                            <tr key={idx} className="border-b hover:bg-slate-50 transition-colors">
+                              <td className="p-5 font-bold text-blue-600">{row.area}</td>
+                              <td className="p-5 font-semibold text-slate-700">{row.branchName}</td>
+                              <td className="p-5 text-center">
+                                <span className="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg font-bold">{row.totalVacancies}</span>
+                              </td>
+                              <td className="p-5 text-center">
+                                <span className="bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg font-bold cursor-pointer hover:bg-blue-100 transition-colors shadow-sm" onClick={() => handleShowDashboardDetail(`รายชื่อผู้สมัครสาขา: ${row.branchName}`, 'applicant', 'all', row.branchCode)} title="คลิกเพื่อดูรายชื่อผู้สมัคร">
+                                  {row.applicantCount}
+                                </span>
+                              </td>
+                              <td className="p-5 cursor-pointer group" onClick={() => handleShowDashboardDetail(`ตำแหน่งที่สำเร็จแล้ว (สาขา: ${row.branchName})`, 'vacancy', 'fulfilled', row.branchCode)} title="คลิกเพื่อดูรายละเอียดตำแหน่งที่ได้คนแล้ว">
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-xs font-bold text-slate-500 flex items-center">
+                                    <span className="text-slate-800">{row.fulfilledVacancies} / {row.totalVacancies}</span>
+                                    <span className="mx-2 text-slate-300">|</span>
+                                    <span className="text-[10px] text-amber-500 mr-2">ว่าง: {row.totalVacancies - row.fulfilledVacancies}</span>
+                                    <span className="text-[10px] text-emerald-500">สำเร็จแล้ว: {row.fulfilledVacancies}</span>
+                                  </span>
+                                  <div className="flex items-center space-x-2">
+                                    <span className="text-[10px] text-blue-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity hidden sm:inline">คลิกดูรายละเอียด</span>
+                                    <span className="text-xs font-black text-emerald-600">{progressPct}%</span>
+                                  </div>
+                                </div>
+                                <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                                  <div 
+                                    className={`h-2.5 rounded-full transition-all duration-700 ease-out ${progressPct === 100 ? 'bg-emerald-500' : progressPct > 0 ? 'bg-blue-500' : 'bg-slate-300'}`} 
+                                    style={{ width: `${progressPct}%` }}
+                                  ></div>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        }) : (
+                          <tr>
+                            <td colSpan="5" className="p-10 text-center text-slate-400 font-medium">
+                              <div className="flex flex-col items-center justify-center">
+                                <Search size={40} className="text-slate-200 mb-3"/>
+                                ไม่พบข้อมูลตามเงื่อนไขที่เลือก
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
+
               </div>
             )}
 
@@ -1269,13 +1394,29 @@
                             <>
                               <div className="text-sm">
                                 <p className="font-bold text-base text-slate-800">{item.position}</p>
-                                <p className="text-slate-500 mt-1 flex items-center font-medium">
-                                  <MapPin size={14} className="mr-1.5 text-slate-400"/> {item.branchName} 
-                                  <span className="mx-2 text-slate-300">|</span> 
-                                  <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md text-xs">{item.area}</span>
-                                </p>
+                                <div className="text-slate-500 mt-1 flex flex-col font-medium gap-1.5">
+                                  <div className="flex items-center">
+                                    <MapPin size={14} className="mr-1.5 text-slate-400"/> {item.branchName} 
+                                    <span className="mx-2 text-slate-300">|</span> 
+                                    <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md text-xs">{item.area}</span>
+                                  </div>
+                                  {/* แสดงข้อมูลผู้สมัครที่ทำให้สถานะสำเร็จ */}
+                                  {['Hired', 'Waiting to Join'].includes(item.insight.computedStatus) && (
+                                    <div className="text-[11px] text-slate-500 flex items-center bg-slate-50 w-fit px-2 py-1 rounded-md border border-slate-100">
+                                      <UserPlus size={12} className="mr-1.5 text-slate-400"/>
+                                      ผู้สมัคร: <span className="font-bold text-slate-700 ml-1">{item.insight.matchedApplicants.find(a => ['ผ่านสัมภาษณ์', 'รอเริ่มงาน'].includes(a.status))?.name || 'ไม่ระบุ'}</span>
+                                    </div>
+                                  )}
+                                  {/* แสดงข้อมูลวันที่มีผลของ Promote&Transfer Done */}
+                                  {item.insight.computedStatus === 'Promote&Transfer Done' && item.effectiveDate && (
+                                    <div className="text-[11px] text-emerald-600 flex items-center bg-emerald-50 w-fit px-2 py-1 rounded-md border border-emerald-100">
+                                      <Clock size={12} className="mr-1.5"/>
+                                      วันที่มีผล: <span className="font-bold ml-1">{new Date(item.effectiveDate).toLocaleDateString('th')}</span>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                              <div className="text-right shrink-0 mt-2 sm:mt-0">
+                              <div className="text-left sm:text-right shrink-0 mt-2 sm:mt-0 flex items-center sm:items-end justify-between sm:justify-center w-full sm:w-auto">
                                 <span className="text-xs font-bold px-3 py-1.5 rounded-full shadow-sm inline-block" style={{backgroundColor:VACANCY_COLORS[item.insight.computedStatus]+'15', color:VACANCY_COLORS[item.insight.computedStatus]}}>
                                   {item.insight.computedStatus}
                                 </span>
