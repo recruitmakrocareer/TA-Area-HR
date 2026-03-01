@@ -27,7 +27,6 @@
   <script type="text/babel" data-type="module">
     import React, { useState, useMemo, useEffect } from 'https://esm.sh/react@18.2.0';
     import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
-    import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'https://esm.sh/recharts@2.12.0?deps=react@18.2.0,react-dom@18.2.0';
     import { Users, UserPlus, BarChart3, Building2, CheckCircle2, Clock, MapPin, Search, AlertCircle, FileText, Briefcase, Phone, MessageSquare, Map, Target, Edit, Trash2, X, BellRing, Download, Paperclip, Upload, Eye, PlusCircle, Settings, Check, Filter } from 'https://esm.sh/lucide-react@0.344.0?deps=react@18.2.0';
 
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzM4EXsW141-nqY7rRwU_MFc9vnrJSbK-8Wdwn-ZJwvfEBlNMZJH2dhE0r2C4uJf7mnxg/exec"; 
@@ -368,14 +367,21 @@
         }
         
         const newRecord = { 
-          id: Date.now().toString(), ta: selectedTA, branchCode: String(addingApplicantFor.branchCode).padStart(3, '0'), 
-          branchName: addingApplicantFor.branchName, position: addingApplicantFor.position, ...formData, 
-          timestamp: getConsistentTimestamp(), updatedAt: Date.now() 
+          id: Date.now().toString() + '_' + Math.floor(Math.random() * 1000).toString().padStart(3, '0'), // ปรับ ID ให้แม่นยำยิ่งขึ้น
+          ta: selectedTA, 
+          branchCode: String(addingApplicantFor.branchCode).padStart(3, '0'), 
+          branchName: addingApplicantFor.branchName, 
+          position: addingApplicantFor.position, 
+          ...formData, 
+          timestamp: getConsistentTimestamp(), 
+          updatedAt: Date.now() 
         };
-        const newApps = [newRecord, ...applicants];
+        // เปลี่ยนมาใช้วิธีนำข้อมูลใหม่ไปต่อท้าย (Append) เพื่อแก้ปัญหาเซฟทับข้อมูลเดิมในบางกรณี
+        const newApps = [...applicants, newRecord];
         setApplicants(newApps);
         setFormData({ name: '', phone: '', status: '', comment: '', startDate: '', resumeName: '', resumeBase64: '' });
-        setAddingApplicantFor(null); syncToCloud(newApps, vacancies);
+        setAddingApplicantFor(null); 
+        syncToCloud(newApps, vacancies);
       };
 
       const deleteApplicant = (id) => {
@@ -431,17 +437,19 @@
         const branch = appBranches.find(b => String(b.code) === String(vacancyForm.branchCode));
         if (!branch) { alert('ไม่พบข้อมูลสาขาในระบบ'); return; }
 
-        // อนุญาตให้เปิดรับตำแหน่งเดิมในสาขาเดิมซ้ำกันได้ตามคำขอ (เช่นรับ 2 คน)
-        // const isDuplicate = vacancies.some(v => String(v.branchCode) === String(branch.code) && String(v.position) === String(vacancyForm.position) && v.manualStatus !== 'Closed');
-        // if (isDuplicate) { alert(`มีตำแหน่งเปิดรับอยู่แล้ว!`); return; }
-
         const newVacancy = { 
-          id: Date.now().toString(), area: branch.area, branchCode: String(branch.code).padStart(3, '0'), 
-          branchName: branch.name, position: vacancyForm.position, manualStatus: vacancyForm.manualStatus, 
+          id: Date.now().toString() + '_' + Math.floor(Math.random() * 1000).toString().padStart(3, '0'), 
+          area: branch.area, 
+          branchCode: String(branch.code).padStart(3, '0'), 
+          branchName: branch.name, 
+          position: vacancyForm.position, 
+          manualStatus: vacancyForm.manualStatus, 
           effectiveDate: vacancyForm.effectiveDate || '',
-          createdAt: Date.now(), timestamp: getConsistentTimestamp() 
+          createdAt: Date.now(), 
+          timestamp: getConsistentTimestamp() 
         };
-        const newVacs = [newVacancy, ...vacancies];
+        // เปลี่ยนมาใช้วิธีต่อท้าย (Append) เช่นเดียวกัน
+        const newVacs = [...vacancies, newVacancy];
         setVacancies(newVacs); setVacancyForm({ branchCode: '', position: '', manualStatus: 'Vacant', effectiveDate: '' });
         syncToCloud(applicants, newVacs);
         
@@ -469,10 +477,6 @@
           return; 
         }
 
-        // อนุญาตให้บันทึกเป็นตำแหน่งที่ซ้ำได้ตามเงื่อนไขใหม่
-        // const isDuplicate = vacancies.some(v => String(v.id) !== String(editVacId) && String(v.branchCode) === String(editVacForm.branchCode) && String(v.position) === String(editVacForm.position) && v.manualStatus !== 'Closed');
-        // if (isDuplicate) { alert(`มีตำแหน่งนี้เปิดรับอยู่แล้ว!`); return; }
-
         const branch = appBranches.find(b => String(b.code) === String(editVacForm.branchCode));
         const newVacs = vacancies.map(v => String(v.id) === String(editVacId) ? { ...editVacForm, area: branch ? branch.area : v.area, branchName: branch ? branch.name : v.branchName } : v);
         setVacancies(newVacs); setEditVacId(null); syncToCloud(applicants, newVacs);
@@ -485,11 +489,13 @@
 
       const availableBranchesForAreas = appBranches.filter(b => selectedAreas.includes(b.area));
       
-      const filteredVacancies = vacancies.filter(v => {
-        const areaMatch = selectedAreas.length === 0 || selectedAreas.includes(v.area);
-        const positionMatch = vacancyPositionFilter === '' || v.position === vacancyPositionFilter;
-        return areaMatch && positionMatch;
-      });
+      const filteredVacancies = useMemo(() => {
+        return [...vacancies].filter(v => {
+          const areaMatch = selectedAreas.length === 0 || selectedAreas.includes(v.area);
+          const positionMatch = vacancyPositionFilter === '' || v.position === vacancyPositionFilter;
+          return areaMatch && positionMatch;
+        }).sort((a, b) => b.createdAt - a.createdAt); // เรียงข้อมูลใหม่ล่าสุดขึ้นบน
+      }, [vacancies, selectedAreas, vacancyPositionFilter]);
 
       const availableVacancyPositions = useMemo(() => {
         const vacsInAreas = vacancies.filter(v => selectedAreas.length === 0 || selectedAreas.includes(v.area));
@@ -547,7 +553,7 @@
       };
 
       const activeVacanciesForRecruit = useMemo(() => {
-        return vacancies.filter(v => {
+        return [...vacancies].filter(v => {
           if (v.manualStatus === 'Closed') return false;
           if (recruitAreaFilter && String(v.area) !== String(recruitAreaFilter)) return false;
           if (recruitBranchFilter && String(v.branchCode) !== String(recruitBranchFilter)) return false;
@@ -569,7 +575,7 @@
             }
           }
           return true;
-        });
+        }).sort((a, b) => b.createdAt - a.createdAt); // เรียงข้อมูลใหม่ล่าสุดขึ้นบน
       }, [vacancies, recruitAreaFilter, recruitBranchFilter, appPositions, selectedTA]);
 
       const dashboardVacancies = useMemo(() => {
@@ -626,7 +632,10 @@
       const branchesForRecruitFilter = appBranches.filter(b => !recruitAreaFilter || String(b.area) === String(recruitAreaFilter));
       const dashboardBranchesForFilter = appBranches.filter(b => !dashboardAreaFilter || String(b.area) === String(dashboardAreaFilter));
       
-      const myApplicants = applicants.filter(app => String(app.ta) === String(selectedTA));
+      const myApplicants = useMemo(() => {
+          return [...applicants].filter(app => String(app.ta) === String(selectedTA)).sort((a, b) => b.updatedAt - a.updatedAt);
+      }, [applicants, selectedTA]);
+
       const dashboardData = useMemo(() => dashboardTA === 'ALL' ? applicants : applicants.filter(app => String(app.ta) === String(dashboardTA)), [applicants, dashboardTA]);
       
       // การดึงข้อมูลเพื่อมาแสดงในตาราง "Progress รายสาขา"
@@ -741,7 +750,7 @@
             // รวม Promote&Transfer ด้วย
             if (filterMode === 'fulfilled') return ['Hired', 'Waiting to Join', 'Promote&Transfer Done', 'Promote&Transfer'].includes(v.insight.computedStatus);
             return true;
-          });
+          }).sort((a, b) => b.createdAt - a.createdAt); // เรียงข้อมูลใน popup ใหม่ไปเก่า
         } else if (type === 'applicant') {
           filteredData = dashboardData.filter(a => {
             if (branchCode && String(a.branchCode) !== String(branchCode)) return false;
@@ -765,7 +774,7 @@
               return ['ติดต่อผู้สมัครไม่ได้', 'ยกเลิกสัมภาษณ์/ไม่มาตามนัด', 'ไม่ผ่านสัมภาษณ์', 'ไม่มีตำแหน่งงานว่าง'].includes(a.status);
             }
             return true;
-          });
+          }).sort((a, b) => b.updatedAt - a.updatedAt); // เรียงข้อมูลใน popup ใหม่ไปเก่า
         }
         setDashboardDetailModal({ title, type, data: filteredData });
       };
@@ -936,7 +945,7 @@
                                   {slaDays}<span className="text-[10px] block font-normal text-slate-500">วัน</span>
                                 </td>
                                 <td className="px-5 py-4 text-center">
-                                  <button onClick={()=>setViewApplicants({position:v.position, branchName:v.branchName, list:matchedApplicants})} disabled={applicantCount===0} className={`w-8 h-8 rounded-lg font-bold border ${applicantCount>0?'bg-blue-50 text-blue-700 hover:bg-blue-100':'bg-slate-50 text-slate-400'}`}>
+                                  <button onClick={()=>setViewApplicants({position:v.position, branchName:v.branchName, list:[...matchedApplicants].sort((a,b)=>b.updatedAt - a.updatedAt)})} disabled={applicantCount===0} className={`w-8 h-8 rounded-lg font-bold border ${applicantCount>0?'bg-blue-50 text-blue-700 hover:bg-blue-100':'bg-slate-50 text-slate-400'}`}>
                                     {applicantCount}
                                   </button>
                                 </td>
