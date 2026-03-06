@@ -539,6 +539,37 @@
         setVacancies(newVacs); syncToCloud(applicants, newVacs);
       };
 
+      // ฟังก์ชันสำหรับดาวน์โหลดไฟล์จาก Base64 อย่างปลอดภัยเพื่อแก้ปัญหา File wasn't available
+      const handleDownloadFile = (base64String, fileName) => {
+        if (!base64String || base64String === 'Uploaded') return;
+        try {
+          const arr = base64String.split(',');
+          if (arr.length !== 2) return;
+          const mimeMatch = arr[0].match(/:(.*?);/);
+          if (!mimeMatch) return;
+          const mime = mimeMatch[1];
+          const bstr = atob(arr[1]);
+          let n = bstr.length;
+          const u8arr = new Uint8Array(n);
+          while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+          }
+          const blob = new Blob([u8arr], { type: mime });
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.style.display = 'none';
+          a.href = url;
+          a.download = fileName || 'Resume';
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+          a.remove();
+        } catch (error) {
+          console.error("Download error:", error);
+          alert("เกิดข้อผิดพลาดในการดาวน์โหลดไฟล์");
+        }
+      };
+
       const availableBranchesForAreas = appBranches.filter(b => selectedAreas.includes(b.area));
       
       const filteredVacancies = useMemo(() => {
@@ -1588,15 +1619,18 @@
             {previewFile && (
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
                 <div className="bg-white p-2 rounded-2xl w-full max-w-4xl h-[85vh] flex flex-col relative shadow-2xl">
-                  <button onClick={()=>setPreviewFile(null)} className="absolute -top-4 -right-4 bg-white hover:bg-slate-100 text-slate-800 rounded-full p-2 shadow-lg transition-colors border"><X size={20}/></button>
+                  <div className="absolute -top-4 -right-4 flex space-x-2">
+                    <button onClick={() => handleDownloadFile(previewFile.base64, previewFile.name)} className="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-2 shadow-lg transition-colors border border-blue-700" title="ดาวน์โหลดไฟล์"><Download size={20}/></button>
+                    <button onClick={()=>setPreviewFile(null)} className="bg-white hover:bg-slate-100 text-slate-800 rounded-full p-2 shadow-lg transition-colors border" title="ปิดหน้าต่าง"><X size={20}/></button>
+                  </div>
                   {previewFile.base64.startsWith('data:image/') || previewFile.base64.startsWith('data:application/pdf') ? 
                     <iframe src={previewFile.base64} className="w-full h-full rounded-xl border-none bg-slate-100"/> : 
                     <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
                       <FileText size={48} className="text-blue-300 mb-4"/>
                       <h3 className="font-bold text-xl mb-6 text-slate-700">{previewFile.name}</h3>
-                      <a href={previewFile.base64} download={previewFile.name} className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-bold flex items-center shadow-md transition-colors">
+                      <button onClick={() => handleDownloadFile(previewFile.base64, previewFile.name)} className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-bold flex items-center shadow-md transition-colors">
                         <Download size={20} className="mr-2"/> ดาวน์โหลดไฟล์
-                      </a>
+                      </button>
                     </div>
                   }
                 </div>
