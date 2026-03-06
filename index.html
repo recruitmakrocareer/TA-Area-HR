@@ -141,6 +141,7 @@
       // Dashboard States
       const [dashboardTA, setDashboardTA] = useState('ALL');
       const [vacancyPositionFilter, setVacancyPositionFilter] = useState('');
+      const [vacancyBranchFilter, setVacancyBranchFilter] = useState('');
       const [dashboardDetailModal, setDashboardDetailModal] = useState(null);
       const [dashboardAreaFilter, setDashboardAreaFilter] = useState('');
       const [dashboardBranchFilter, setDashboardBranchFilter] = useState('');
@@ -493,9 +494,10 @@
         return [...vacancies].filter(v => {
           const areaMatch = selectedAreas.length === 0 || selectedAreas.includes(v.area);
           const positionMatch = vacancyPositionFilter === '' || v.position === vacancyPositionFilter;
-          return areaMatch && positionMatch;
+          const branchMatch = vacancyBranchFilter === '' || String(v.branchCode) === String(vacancyBranchFilter);
+          return areaMatch && positionMatch && branchMatch;
         }).sort((a, b) => b.createdAt - a.createdAt); // เรียงข้อมูลใหม่ล่าสุดขึ้นบน
-      }, [vacancies, selectedAreas, vacancyPositionFilter]);
+      }, [vacancies, selectedAreas, vacancyPositionFilter, vacancyBranchFilter]);
 
       const availableVacancyPositions = useMemo(() => {
         const vacsInAreas = vacancies.filter(v => selectedAreas.length === 0 || selectedAreas.includes(v.area));
@@ -840,9 +842,6 @@
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <select required name="branchCode" value={vacancyForm.branchCode} onChange={handleVacancyInputChange} className="w-full border rounded-xl px-4 py-2.5 outline-none focus:border-blue-500">
                           <option value="">-- เลือกสาขา --</option>
-                          {availableBranchesForAreas.map(b => <option key={b.code} value={b.code}>[{b.area}] {b.name}</option>)}
-                        </select>
-                        <select required name="position" value={vacancyForm.position} onChange={handleVacancyInputChange} className="w-full border rounded-xl px-4 py-2.5 outline-none focus:border-blue-500">
                           <option value="">-- เลือกตำแหน่งงาน --</option>
                           {uniquePositionNames.map(pos => <option key={pos} value={pos}>{pos}</option>)}
                         </select>
@@ -867,6 +866,21 @@
                     <div className="px-6 py-4 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                       <h3 className="font-bold text-lg">รายการตำแหน่งงาน (Job Vacancies)</h3>
                       <div className="flex items-center w-full sm:w-auto space-x-3">
+                        <div className="relative flex-1 sm:w-48">
+                           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                             <Building2 size={14} className="text-slate-400" />
+                           </div>
+                           <select
+                             value={vacancyBranchFilter}
+                             onChange={(e) => setVacancyBranchFilter(e.target.value)}
+                             className="w-full pl-9 pr-4 py-2.5 border rounded-lg text-sm outline-none focus:border-blue-500 bg-slate-50 hover:bg-slate-100 transition-colors appearance-none font-medium text-slate-700 truncate"
+                           >
+                             <option value="">ทุกสาขา</option>
+                             {availableBranchesForAreas.map(b => (
+                               <option key={b.code} value={b.code}>{b.name}</option>
+                             ))}
+                           </select>
+                        </div>
                         <div className="relative flex-1 sm:w-64">
                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                              <Filter size={14} className="text-slate-400" />
