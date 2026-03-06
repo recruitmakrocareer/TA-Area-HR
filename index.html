@@ -486,10 +486,40 @@
         setIsSaving(false); // ปิดสถานะบันทึกเสร็จสิ้น
       };
 
-      const deleteApplicant = (id) => {
+      // 🟢 ฟังก์ชันลบข้อมูลผู้สมัคร (สั่งลบที่ Google Script ด้วย)
+      const deleteApplicant = async (id) => {
         if (window.confirm('ลบข้อมูลผู้สมัครรายนี้?')) {
+          const appToDelete = applicants.find(a => String(a.id) === String(id));
           const newApps = applicants.filter(a => String(a.id) !== String(id));
-          setApplicants(newApps); syncToCloud(newApps, vacancies);
+          
+          setApplicants(newApps); 
+          
+          // บันทึกการลบลง LocalStorage ในเครื่อง
+          const safeAppsForLocal = newApps.map(app => ({
+            ...app,
+            resumeBase64: (app.resumeBase64 && app.resumeBase64.length > 1000 && !app.resumeBase64.startsWith('http')) ? 'Uploaded' : app.resumeBase64
+          }));
+          localStorage.setItem('hr_applicants', JSON.stringify(safeAppsForLocal));
+
+          // ส่งคำสั่งไปลบที่ Google Script
+          if (GOOGLE_SCRIPT_URL && cloudStatus === 'connected') {
+            try {
+              setCloudStatus('syncing');
+              await fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ 
+                  action: 'deleteRecord', 
+                  sheetName: 'Applicants', 
+                  recordId: id,
+                  fileUrl: appToDelete ? appToDelete.resumeBase64 : null // แนบ URL ไปลบไฟล์ในไดรฟ์ด้วย
+                })
+              });
+              setTimeout(() => setCloudStatus('connected'), 1000);
+            } catch (err) {
+              setCloudStatus('error');
+              console.error('Delete error', err);
+            }
+          }
         }
       };
 
@@ -576,9 +606,30 @@
         }
       };
 
-      const deleteVacancy = (id) => {
+      // 🟢 ฟังก์ชันลบข้อมูลตำแหน่งงาน (สั่งลบที่ Google Script ด้วย)
+      const deleteVacancy = async (id) => {
         if (window.confirm('ลบตำแหน่งงานนี้?')) {
-          setVacancies(vacancies.filter(v => String(v.id) !== String(id))); syncToCloud(applicants, vacancies.filter(v => String(v.id) !== String(id)));
+          const newVacs = vacancies.filter(v => String(v.id) !== String(id));
+          setVacancies(newVacs);
+          localStorage.setItem('hr_vacancies', JSON.stringify(newVacs));
+          
+          if (GOOGLE_SCRIPT_URL && cloudStatus === 'connected') {
+            try {
+              setCloudStatus('syncing');
+              await fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ 
+                  action: 'deleteRecord', 
+                  sheetName: 'Vacancies', 
+                  recordId: id
+                })
+              });
+              setTimeout(() => setCloudStatus('connected'), 1000);
+            } catch (err) {
+              setCloudStatus('error');
+              console.error('Delete error', err);
+            }
+          }
         }
       };
 
