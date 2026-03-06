@@ -3,16 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HR Recruitment Workspace</title>
+  <title>HR Recruitment Workspace - Pro Edition</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <!-- เพิ่ม Library สำหรับ Export PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
-    ::-webkit-scrollbar { width: 8px; height: 8px; }
-    ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
-    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800&display=swap');
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
     ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #F8FAFC; }
+    body { font-family: 'Prompt', sans-serif; background-color: #f1f5f9; background-image: radial-gradient(#e2e8f0 1px, transparent 1px); background-size: 20px 20px; }
     .hide-scrollbar::-webkit-scrollbar { display: none; }
     .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     .status-select {
@@ -20,6 +23,7 @@
       background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
       background-repeat: no-repeat; background-position: right 0.4rem center; background-size: 1em; padding-right: 1.6rem;
     }
+    .glass-effect { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
   </style>
 </head>
 <body>
@@ -27,9 +31,9 @@
   <script type="text/babel" data-type="module">
     import React, { useState, useMemo, useEffect } from 'https://esm.sh/react@18.2.0';
     import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
-    import { Users, UserPlus, BarChart3, Building2, CheckCircle2, Clock, MapPin, Search, AlertCircle, FileText, Briefcase, Phone, MessageSquare, Map, Target, Edit, Trash2, X, BellRing, Download, Paperclip, Upload, Eye, PlusCircle, Settings, Check, Filter, Loader2 } from 'https://esm.sh/lucide-react@0.344.0?deps=react@18.2.0';
+    import { Users, UserPlus, BarChart3, Building2, CheckCircle2, Clock, MapPin, Search, AlertCircle, FileText, Briefcase, Phone, MessageSquare, Map, Target, Edit, Trash2, X, BellRing, Download, Paperclip, Upload, Eye, PlusCircle, Settings, Check, Filter, Loader2, Send, Printer } from 'https://esm.sh/lucide-react@0.344.0?deps=react@18.2.0';
 
-    // ใส่ URL ใหม่ที่คุณ Deploy ได้มาตรงนี้ครับ
+    // วาง URL ของ Google Apps Script ของคุณที่นี่
     const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw8gOemK9nDgFTffllbI15AelpJKzA5Kk-pFwwH7BoYZ6PFdGHR6FqK53-O_KnBpsyWCQ/exec"; 
 
     const DEFAULT_TAS = ['TA 1 (คุณเอ)', 'TA 2 (คุณบี)', 'TA 3 (คุณซี)', 'TA 4 (คุณดี)'];
@@ -51,29 +55,16 @@
     const VACANCY_STATUSES = ['Vacant', 'Promote&Transfer', 'Promote&Transfer Done', 'Hold', 'Closed'];
 
     const STATUS_COLORS = { 
-      'รอพิจารณาประวัติ': '#06B6D4',
-      'ผ่านสัมภาษณ์': '#10B981', 
-      'รอผลสัมภาษณ์': '#3B82F6', 
-      'ติดต่อผู้สมัครไม่ได้': '#64748B', 
-      'อยู่ระหว่างนัดสัมภาษณ์': '#F59E0B', 
-      'ยกเลิกสัมภาษณ์/ไม่มาตามนัด': '#EF4444', 
-      'ไม่ผ่านสัมภาษณ์': '#DC2626', 
-      'ไม่มีตำแหน่งงานว่าง': '#94A3B8', 
-      'สำรอง/เก็บไว้พิจารณา': '#8B5CF6', 
-      'ตรวจสุขภาพ': '#06B6D4', 
-      'รอเริ่มงาน': '#0EA5E9',
-      'อื่นๆ': '#F97316' 
+      'รอพิจารณาประวัติ': '#06B6D4', 'ผ่านสัมภาษณ์': '#10B981', 'รอผลสัมภาษณ์': '#3B82F6', 
+      'ติดต่อผู้สมัครไม่ได้': '#64748B', 'อยู่ระหว่างนัดสัมภาษณ์': '#F59E0B', 'ยกเลิกสัมภาษณ์/ไม่มาตามนัด': '#EF4444', 
+      'ไม่ผ่านสัมภาษณ์': '#DC2626', 'ไม่มีตำแหน่งงานว่าง': '#94A3B8', 'สำรอง/เก็บไว้พิจารณา': '#8B5CF6', 
+      'ตรวจสุขภาพ': '#06B6D4', 'รอเริ่มงาน': '#0EA5E9', 'อื่นๆ': '#F97316' 
     };
     
     const VACANCY_COLORS = { 
-      'Vacant': '#F59E0B', 
-      'Promote&Transfer': '#8B5CF6', 
-      'Promote&Transfer Done': '#10B981', 
-      'Hold': '#64748B', 
-      'Closed': '#94A3B8', 
-      'รอตรวจสุขภาพ': '#06B6D4', 
-      'Waiting to Join': '#0EA5E9', 
-      'Hired': '#10B981' 
+      'Vacant': '#F59E0B', 'Promote&Transfer': '#8B5CF6', 'Promote&Transfer Done': '#10B981', 
+      'Hold': '#64748B', 'Closed': '#94A3B8', 'รอตรวจสุขภาพ': '#06B6D4', 
+      'Waiting to Join': '#0EA5E9', 'Hired': '#10B981' 
     };
 
     const parseDateToMs = (val) => {
@@ -88,9 +79,7 @@
         let datePart = val.split(' ')[0];
         let parts = datePart.includes('/') ? datePart.split('/') : datePart.split('-');
         if (parts.length >= 2) {
-          let p1 = parseInt(parts[0], 10);
-          let p2 = parseInt(parts[1], 10);
-          let p3 = parts.length === 3 ? parseInt(parts[2], 10) : new Date().getFullYear();
+          let p1 = parseInt(parts[0], 10), p2 = parseInt(parts[1], 10), p3 = parts.length === 3 ? parseInt(parts[2], 10) : new Date().getFullYear();
           let day = p1, month = p2 - 1, year = p3;
           if (p1 > 1000) { year = p1; month = p2 - 1; day = parts.length === 3 ? parseInt(parts[2], 10) : 1; }
           if (year > 2500) year -= 543; 
@@ -105,19 +94,16 @@
 
     const getConsistentTimestamp = () => {
       const d = new Date();
-      const day = String(d.getDate()).padStart(2, '0');
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const year = d.getFullYear();
-      const hrs = String(d.getHours()).padStart(2, '0');
-      const mins = String(d.getMinutes()).padStart(2, '0');
-      const secs = String(d.getSeconds()).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0'), month = String(d.getMonth() + 1).padStart(2, '0'), year = d.getFullYear();
+      const hrs = String(d.getHours()).padStart(2, '0'), mins = String(d.getMinutes()).padStart(2, '0'), secs = String(d.getSeconds()).padStart(2, '0');
       return `${day}/${month}/${year} ${hrs}:${mins}:${secs}`;
     };
 
     function App() {
-      const [activeTab, setActiveTab] = useState('entry');
+      const [activeTab, setActiveTab] = useState('dashboard');
       const [isLoading, setIsLoading] = useState(true); 
-      const [isSaving, setIsSaving] = useState(false); // State เพิ่มสำหรับตอนกำลังอัปโหลดไฟล์
+      const [isSaving, setIsSaving] = useState(false); 
+      const [isSendingLine, setIsSendingLine] = useState(false);
       const [cloudStatus, setCloudStatus] = useState('loading'); 
       const [appBranches, setAppBranches] = useState([]);
       const [appAreas, setAppAreas] = useState([]);
@@ -140,6 +126,9 @@
       const [editVacId, setEditVacId] = useState(null);
       const [editVacForm, setEditVacForm] = useState({});
       
+      // เพิ่ม State สำหรับ LINE Token
+      const [lineToken, setLineToken] = useState(localStorage.getItem('hr_line_token') || '');
+      
       // Dashboard States
       const [dashboardTA, setDashboardTA] = useState('ALL');
       const [vacancyPositionFilter, setVacancyPositionFilter] = useState('');
@@ -150,15 +139,13 @@
 
       const uniquePositionNames = useMemo(() => [...new Set(appPositions.map(p => p.position))], [appPositions]);
 
-      // ฟังก์ชันสำหรับดึงข้อมูลใหม่ล่าสุดจาก Cloud
       const fetchFreshData = async () => {
         if (!GOOGLE_SCRIPT_URL) return null;
         try {
           const res = await fetch(`${GOOGLE_SCRIPT_URL}?t=${new Date().getTime()}`);
           const data = await res.json();
           
-          let loadedApps = [];
-          let loadedVacs = [];
+          let loadedApps = []; let loadedVacs = [];
           
           if (data.applicants) loadedApps = data.applicants.map(a => ({...a, id: String(a.id), branchCode: String(a.branchCode).padStart(3, '0')}));
           if (data.vacancies) loadedVacs = data.vacancies.map(v => ({...v, id: String(v.id), branchCode: String(v.branchCode).padStart(3, '0')}));
@@ -166,10 +153,8 @@
           setApplicants(loadedApps);
           setVacancies(loadedVacs);
           
-          // บันทึกลง LocalStorage (แปลง Base64 ยาวๆ ออกก่อนเพื่อไม่ให้กินพื้นที่)
           const safeAppsForLocal = loadedApps.map(app => ({
-            ...app,
-            resumeBase64: (app.resumeBase64 && app.resumeBase64.length > 1000 && !String(app.resumeBase64).startsWith('http')) ? 'Uploaded' : app.resumeBase64
+            ...app, resumeBase64: (app.resumeBase64 && app.resumeBase64.length > 1000 && !String(app.resumeBase64).startsWith('http')) ? 'Uploaded' : app.resumeBase64
           }));
           localStorage.setItem('hr_applicants', JSON.stringify(safeAppsForLocal));
           localStorage.setItem('hr_vacancies', JSON.stringify(loadedVacs));
@@ -185,70 +170,39 @@
         const normalizePositions = (positions) => {
           return positions.map(p => {
             if (typeof p === 'string') return { position: p, recruit: '', area: '' };
-            return { 
-              position: String(p.position || p.name || '').trim(), 
-              recruit: String(p.recruit || '').trim(),
-              area: String(p.area || '').trim() 
-            };
+            return { position: String(p.position || p.name || '').trim(), recruit: String(p.recruit || '').trim(), area: String(p.area || '').trim() };
           });
         };
 
         const initLoad = async () => {
-          setIsLoading(true);
-          setCloudStatus('loading');
-
+          setIsLoading(true); setCloudStatus('loading');
           try {
-            const data = await fetchFreshData(); // ใช้ฟังก์ชันดึงข้อมูลร่วม
+            const data = await fetchFreshData(); 
             if (data) {
               setCloudStatus('connected');
-              
               if (data.branches && data.branches.length > 0) {
-                  setAppBranches(data.branches.map(b => ({
-                      ...b, 
-                      code: String(b.code).padStart(3, '0'),
-                      name: String(b.name).trim() === 'Ma' ? 'สาขาศาลายา' : String(b.name).trim()
-                  })));
-              } else {
-                  setAppBranches(DEFAULT_BRANCHES);
-              }
+                  setAppBranches(data.branches.map(b => ({...b, code: String(b.code).padStart(3, '0'), name: String(b.name).trim() === 'Ma' ? 'สาขาศาลายา' : String(b.name).trim()})));
+              } else setAppBranches(DEFAULT_BRANCHES);
               if (data.tas && data.tas.length > 0) setAppTAs(data.tas.map(t => String(t.name || t)));
               else setAppTAs(DEFAULT_TAS);
               if (data.positions && data.positions.length > 0) setAppPositions(normalizePositions(data.positions));
               else setAppPositions(DEFAULT_POSITIONS);
             }
           } catch (e) {
-            console.error("ดึงข้อมูลจาก Cloud ไม่สำเร็จ", e);
             setCloudStatus('error');
+            let loadedApps = []; let loadedVacs = [];
+            let localApps = localStorage.getItem('hr_applicants'); let localVacs = localStorage.getItem('hr_vacancies');
+            if (localApps) loadedApps = JSON.parse(localApps); if (localVacs) loadedVacs = JSON.parse(localVacs);
             
-            // กรณีออฟไลน์ ให้ดึงข้อมูลจาก LocalStorage
-            let loadedApps = [];
-            let loadedVacs = [];
-            let localApps = localStorage.getItem('hr_applicants');
-            let localVacs = localStorage.getItem('hr_vacancies');
-            if (localApps) loadedApps = JSON.parse(localApps);
-            if (localVacs) loadedVacs = JSON.parse(localVacs);
-            
-            setApplicants(loadedApps);
-            setVacancies(loadedVacs);
-
+            setApplicants(loadedApps); setVacancies(loadedVacs);
             const localBranches = localStorage.getItem('hr_branches');
-            if (localBranches) { 
-                try { 
-                    setAppBranches(JSON.parse(localBranches).map(b => ({
-                        ...b,
-                        name: String(b.name).trim() === 'Ma' ? 'สาขาศาลายา' : String(b.name).trim()
-                    }))); 
-                } catch(err) {} 
-            }
+            if (localBranches) { try { setAppBranches(JSON.parse(localBranches).map(b => ({...b, name: String(b.name).trim() === 'Ma' ? 'สาขาศาลายา' : String(b.name).trim()}))); } catch(err) {} }
             else setAppBranches(DEFAULT_BRANCHES);
             const localTAs = localStorage.getItem('hr_tas');
-            if (localTAs) { try { setAppTAs(JSON.parse(localTAs)); } catch(e) {} }
-            else setAppTAs(DEFAULT_TAS);
+            if (localTAs) { try { setAppTAs(JSON.parse(localTAs)); } catch(e) {} } else setAppTAs(DEFAULT_TAS);
             const localPositions = localStorage.getItem('hr_positions');
-            if (localPositions) { try { setAppPositions(normalizePositions(JSON.parse(localPositions))); } catch(e) {} }
-            else setAppPositions(DEFAULT_POSITIONS);
+            if (localPositions) { try { setAppPositions(normalizePositions(JSON.parse(localPositions))); } catch(e) {} } else setAppPositions(DEFAULT_POSITIONS);
           }
-
           setIsLoading(false);
         };
         initLoad();
@@ -257,51 +211,33 @@
       useEffect(() => {
         if (appBranches.length > 0) {
           const uniqueAreas = [...new Set(appBranches.map(b => String(b.area)))].sort((a,b) => {
-            const numA = parseInt(a.replace(/\D/g, '')) || 0;
-            const numB = parseInt(b.replace(/\D/g, '')) || 0;
+            const numA = parseInt(a.replace(/\D/g, '')) || 0; const numB = parseInt(b.replace(/\D/g, '')) || 0;
             return numA - numB;
           });
           setAppAreas(uniqueAreas);
         }
       }, [appBranches]);
 
-      // ฟังก์ชันจัดการการเปิดไฟล์ (รองรับทั้ง Base64 และ Google Drive URL)
       const handleViewResume = (e, fileData, fileName) => {
         if (e) e.stopPropagation();
         if (!fileData || fileData === 'Uploaded') return;
-        
         const fileString = String(fileData);
-        if (fileString.startsWith('http')) {
-          // ถ้าเป็น Google Drive URL ให้เปิด Tab ใหม่เลย
-          window.open(fileString, '_blank');
-        } else if (fileString.startsWith('Error')) {
-          // ถ้ามี Error จากฝั่ง Apps Script
-          alert('เกิดข้อผิดพลาดจากเซิร์ฟเวอร์: \n' + fileString);
-        } else {
-          // ถ้าเป็น Base64 ที่ค้างอยู่ในแอป ยังไม่ได้ส่งขึ้น Cloud ให้เปิด Preview 
-          setPreviewFile({ name: fileName || 'Resume', base64: fileString });
-        }
+        if (fileString.startsWith('http')) window.open(fileString, '_blank');
+        else if (fileString.startsWith('Error')) alert('เกิดข้อผิดพลาดจากเซิร์ฟเวอร์: \n' + fileString);
+        else setPreviewFile({ name: fileName || 'Resume', base64: fileString });
       };
 
-      // ป้องกันไม่ให้เซฟ Base64 ลง LocalStorage
       const syncToCloud = async (newApps, newVacs, forceSync = false) => {
         const safeAppsForLocal = newApps.map(app => ({
-          ...app,
-          resumeBase64: (app.resumeBase64 && app.resumeBase64.length > 1000 && !app.resumeBase64.startsWith('http')) ? 'Uploaded' : app.resumeBase64
+          ...app, resumeBase64: (app.resumeBase64 && app.resumeBase64.length > 1000 && !app.resumeBase64.startsWith('http')) ? 'Uploaded' : app.resumeBase64
         }));
-        
         try {
           localStorage.setItem('hr_applicants', JSON.stringify(safeAppsForLocal));
           localStorage.setItem('hr_vacancies', JSON.stringify(newVacs));
-        } catch (err) {
-          console.warn("LocalStorage เต็ม ข้ามการเซฟลงเครื่อง");
-        }
+        } catch (err) {}
 
         const isSafeToSync = forceSync || cloudStatus === 'connected' || cloudStatus === 'syncing';
-        if (!isSafeToSync) {
-            alert('⚠️ คุณอยู่ใน "โหมดออฟไลน์" ระบบจะบันทึกในเครื่องเท่านั้น ไม่ส่งขึ้นระบบกลางป้องกันการลบทับ');
-            return;
-        }
+        if (!isSafeToSync) { alert('⚠️ คุณอยู่ใน "โหมดออฟไลน์" ระบบจะบันทึกในเครื่องเท่านั้น'); return; }
         if (GOOGLE_SCRIPT_URL) {
           try {
             setCloudStatus('syncing');
@@ -310,10 +246,7 @@
               body: JSON.stringify({ action: 'saveAll', applicants: newApps, vacancies: newVacs })
             });
             setTimeout(() => setCloudStatus('connected'), 1000);
-          } catch (error) { 
-            setCloudStatus('error'); 
-            throw error;
-          }
+          } catch (error) { setCloudStatus('error'); throw error; }
         }
       };
 
@@ -342,8 +275,7 @@
             const newBranches = [];
             for (let i = 1; i < data.length; i++) {
               if (data[i] && data[i][0] && data[i][1] && data[i][2]) {
-                let rawName = String(data[i][1]).replace(/\n|\r/g, '').trim();
-                let finalName = rawName === 'Ma' ? 'สาขาศาลายา' : rawName;
+                let finalName = String(data[i][1]).replace(/\n|\r/g, '').trim() === 'Ma' ? 'สาขาศาลายา' : String(data[i][1]).replace(/\n|\r/g, '').trim();
                 newBranches.push({ code: String(data[i][0]).padStart(3, '0'), name: finalName, area: String(data[i][2]).replace(/\r/g, '').trim() });
               }
             }
@@ -413,17 +345,35 @@
         XLSX.utils.book_append_sheet(wb, ws, "Data"); XLSX.writeFile(wb, `${filename}.xlsx`);
       };
 
+      // 📄 ฟังก์ชัน: สร้าง PDF จากหน้า Dashboard
+      const exportDashboardToPDF = () => {
+        const element = document.getElementById('dashboard-export-area');
+        if (!element) return;
+        
+        // ซ่อนปุ่มที่ไม่ต้องการให้ติดไปใน PDF
+        const buttonsToHide = document.querySelectorAll('.hide-on-pdf');
+        buttonsToHide.forEach(btn => btn.style.display = 'none');
+
+        const opt = {
+          margin:       [0.3, 0.3, 0.3, 0.3],
+          filename:     `HR_Report_${getConsistentTimestamp().replace(/[:\/ ]/g, '_')}.pdf`,
+          image:        { type: 'jpeg', quality: 0.98 },
+          html2canvas:  { scale: 2, useCORS: true, logging: false },
+          jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+        };
+
+        html2pdf().set(opt).from(element).save().then(() => {
+          // แสดงปุ่มกลับมาหลังโหลดเสร็จ
+          buttonsToHide.forEach(btn => btn.style.display = '');
+        });
+      };
+
       const handleInputChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
       
-      // จำกัดขนาดไฟล์ก่อนอัปโหลดไม่เกิน 3MB
       const handleFileUpload = (e) => {
         const file = e.target.files[0];
         if (file) {
-          if (file.size > 3145728) {
-            alert("ไฟล์มีขนาดใหญ่เกินไป กรุณาแนบไฟล์ขนาดไม่เกิน 3MB");
-            e.target.value = ''; 
-            return;
-          }
+          if (file.size > 3145728) { alert("ไฟล์มีขนาดใหญ่เกินไป กรุณาแนบไฟล์ขนาดไม่เกิน 3MB"); e.target.value = ''; return; }
           const reader = new FileReader();
           reader.onloadend = () => setFormData(prev => ({ ...prev, resumeBase64: reader.result, resumeName: file.name }));
           reader.readAsDataURL(file);
@@ -433,92 +383,56 @@
       const handleEditFileUpload = (e) => {
         const file = e.target.files[0];
         if (file) {
-          if (file.size > 3145728) {
-            alert("ไฟล์มีขนาดใหญ่เกินไป กรุณาแนบไฟล์ขนาดไม่เกิน 3MB");
-            e.target.value = '';
-            return;
-          }
+          if (file.size > 3145728) { alert("ไฟล์มีขนาดใหญ่เกินไป กรุณาแนบไฟล์ขนาดไม่เกิน 3MB"); e.target.value = ''; return; }
           const reader = new FileReader();
-          reader.onloadend = () => {
-            setEditAppForm(prev => ({ ...prev, resumeBase64: reader.result, resumeName: file.name }));
-          };
+          reader.onloadend = () => { setEditAppForm(prev => ({ ...prev, resumeBase64: reader.result, resumeName: file.name })); };
           reader.readAsDataURL(file);
         }
       };
       
-      // ล้างค่า Base64 ออกจาก State หลักหลังกด submit เพื่อไม่ให้ค้างและเซฟซ้ำ
       const handleRecruitSubmit = async (e) => {
         e.preventDefault();
         if (!selectedTA || !addingApplicantFor) return;
-
-        if (formData.status === 'รอเริ่มงาน' && !formData.startDate) { 
-          alert('กรุณาระบุวันที่เริ่มงาน'); 
-          return; 
-        }
+        if (formData.status === 'รอเริ่มงาน' && !formData.startDate) { alert('กรุณาระบุวันที่เริ่มงาน'); return; }
         
-        setIsSaving(true); // เปิดสถานะกำลังบันทึก
-
+        setIsSaving(true);
         const newRecord = { 
           id: Date.now().toString() + '_' + Math.floor(Math.random() * 1000).toString().padStart(3, '0'), 
-          ta: selectedTA, 
-          branchCode: String(addingApplicantFor.branchCode).padStart(3, '0'), 
-          branchName: addingApplicantFor.branchName, 
-          position: addingApplicantFor.position, 
-          ...formData, 
-          timestamp: getConsistentTimestamp(), 
-          updatedAt: Date.now() 
+          ta: selectedTA, branchCode: String(addingApplicantFor.branchCode).padStart(3, '0'), 
+          branchName: addingApplicantFor.branchName, position: addingApplicantFor.position, 
+          ...formData, timestamp: getConsistentTimestamp(), updatedAt: Date.now() 
         };
 
         const newApps = [...applicants, newRecord];
-        setApplicants(newApps); // แทรกลง UI ทันที ให้ดูสมูท
-        
+        setApplicants(newApps);
         setFormData({ name: '', phone: '', status: '', comment: '', startDate: '', resumeName: '', resumeBase64: '' });
         setAddingApplicantFor(null); 
         
         await syncToCloud(newApps, vacancies);
-
-        // ดึงข้อมูลล่าสุดจาก Cloud เพื่ออัปเดต URL ของ Drive ให้ปุ่มพรีวิวขึ้นอัตโนมัติ
-        try {
-          await fetchFreshData();
-        } catch (err) {
-          console.log("Fetch updated data failed.");
-        }
-        setIsSaving(false); // ปิดสถานะบันทึกเสร็จสิ้น
+        try { await fetchFreshData(); } catch (err) {}
+        setIsSaving(false); 
       };
 
-      // 🟢 ฟังก์ชันลบข้อมูลผู้สมัคร (สั่งลบที่ Google Script ด้วย)
       const deleteApplicant = async (id) => {
         if (window.confirm('ลบข้อมูลผู้สมัครรายนี้?')) {
           const appToDelete = applicants.find(a => String(a.id) === String(id));
           const newApps = applicants.filter(a => String(a.id) !== String(id));
-          
           setApplicants(newApps); 
           
-          // บันทึกการลบลง LocalStorage ในเครื่อง
           const safeAppsForLocal = newApps.map(app => ({
-            ...app,
-            resumeBase64: (app.resumeBase64 && app.resumeBase64.length > 1000 && !app.resumeBase64.startsWith('http')) ? 'Uploaded' : app.resumeBase64
+            ...app, resumeBase64: (app.resumeBase64 && app.resumeBase64.length > 1000 && !app.resumeBase64.startsWith('http')) ? 'Uploaded' : app.resumeBase64
           }));
           localStorage.setItem('hr_applicants', JSON.stringify(safeAppsForLocal));
 
-          // ส่งคำสั่งไปลบที่ Google Script
           if (GOOGLE_SCRIPT_URL && cloudStatus === 'connected') {
             try {
               setCloudStatus('syncing');
               await fetch(GOOGLE_SCRIPT_URL, {
                 method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ 
-                  action: 'deleteRecord', 
-                  sheetName: 'Applicants', 
-                  recordId: id,
-                  fileUrl: appToDelete ? appToDelete.resumeBase64 : null // แนบ URL ไปลบไฟล์ในไดรฟ์ด้วย
-                })
+                body: JSON.stringify({ action: 'deleteRecord', sheetName: 'Applicants', recordId: id, fileUrl: appToDelete ? appToDelete.resumeBase64 : null })
               });
               setTimeout(() => setCloudStatus('connected'), 1000);
-            } catch (err) {
-              setCloudStatus('error');
-              console.error('Delete error', err);
-            }
+            } catch (err) { setCloudStatus('error'); }
           }
         }
       };
@@ -527,30 +441,19 @@
       
       const saveEditApp = async () => {
         if (['อื่นๆ', 'ติดต่อผู้สมัครไม่ได้', 'ยกเลิกสัมภาษณ์/ไม่มาตามนัด', 'ไม่ผ่านสัมภาษณ์', 'ไม่มีตำแหน่งงานว่าง'].includes(editAppForm.status) && !editAppForm.comment) { 
-          alert('กรุณาระบุเหตุผล'); 
-          return; 
+          alert('กรุณาระบุเหตุผล'); return; 
         }
-        if (editAppForm.status === 'รอเริ่มงาน' && !editAppForm.startDate) { 
-          alert('กรุณาระบุวันที่เริ่มงาน'); 
-          return; 
-        }
+        if (editAppForm.status === 'รอเริ่มงาน' && !editAppForm.startDate) { alert('กรุณาระบุวันที่เริ่มงาน'); return; }
 
-        setIsSaving(true); // เปิดสถานะกำลังบันทึก
+        setIsSaving(true);
         if (!['อื่นๆ', 'ติดต่อผู้สมัครไม่ได้', 'ยกเลิกสัมภาษณ์/ไม่มาตามนัด', 'ไม่ผ่านสัมภาษณ์', 'ไม่มีตำแหน่งงานว่าง'].includes(editAppForm.status)) editAppForm.comment = '';
         
         const newApps = applicants.map(a => String(a.id) === String(editAppId) ? { ...editAppForm, updatedAt: Date.now() } : a);
         setApplicants(newApps); 
         await syncToCloud(newApps, vacancies);
 
-        // ดึงข้อมูลล่าสุดจาก Cloud เพื่ออัปเดต URL ของ Drive ให้ปุ่มพรีวิวขึ้นอัตโนมัติ
-        try {
-          await fetchFreshData();
-        } catch (err) {
-          console.log("Fetch updated data failed.");
-        }
-        
-        setIsSaving(false);
-        setEditAppId(null);
+        try { await fetchFreshData(); } catch (err) {}
+        setIsSaving(false); setEditAppId(null);
       };
 
       const handleInlineStatusChange = (app, newStatus) => {
@@ -572,25 +475,17 @@
       
       const handleVacancySubmit = (e) => {
         e.preventDefault();
-        
-        if (vacancyForm.manualStatus === 'Promote&Transfer Done' && !vacancyForm.effectiveDate) { 
-          alert('กรุณาระบุวันที่มีผล (Effective Date)'); 
-          return; 
-        }
+        if (vacancyForm.manualStatus === 'Promote&Transfer Done' && !vacancyForm.effectiveDate) { alert('กรุณาระบุวันที่มีผล (Effective Date)'); return; }
 
         const branch = appBranches.find(b => String(b.code) === String(vacancyForm.branchCode));
         if (!branch) { alert('ไม่พบข้อมูลสาขาในระบบ'); return; }
 
         const newVacancy = { 
           id: Date.now().toString() + '_' + Math.floor(Math.random() * 1000).toString().padStart(3, '0'), 
-          area: branch.area, 
-          branchCode: String(branch.code).padStart(3, '0'), 
-          branchName: branch.name, 
-          position: vacancyForm.position, 
-          manualStatus: vacancyForm.manualStatus, 
-          effectiveDate: vacancyForm.effectiveDate || '',
-          createdAt: Date.now(), 
-          timestamp: getConsistentTimestamp() 
+          area: branch.area, branchCode: String(branch.code).padStart(3, '0'), 
+          branchName: branch.name, position: vacancyForm.position, 
+          manualStatus: vacancyForm.manualStatus, effectiveDate: vacancyForm.effectiveDate || '',
+          createdAt: Date.now(), timestamp: getConsistentTimestamp() 
         };
         const newVacs = [...vacancies, newVacancy];
         setVacancies(newVacs); setVacancyForm({ branchCode: '', position: '', manualStatus: 'Vacant', effectiveDate: '' });
@@ -602,11 +497,10 @@
               method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
               body: JSON.stringify({ action: 'notifyNewVacancy', vacancy: newVacancy })
             });
-          } catch (error) { console.error('Email Error:', error); }
+          } catch (error) {}
         }
       };
 
-      // 🟢 ฟังก์ชันลบข้อมูลตำแหน่งงาน (สั่งลบที่ Google Script ด้วย)
       const deleteVacancy = async (id) => {
         if (window.confirm('ลบตำแหน่งงานนี้?')) {
           const newVacs = vacancies.filter(v => String(v.id) !== String(id));
@@ -618,17 +512,10 @@
               setCloudStatus('syncing');
               await fetch(GOOGLE_SCRIPT_URL, {
                 method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ 
-                  action: 'deleteRecord', 
-                  sheetName: 'Vacancies', 
-                  recordId: id
-                })
+                body: JSON.stringify({ action: 'deleteRecord', sheetName: 'Vacancies', recordId: id })
               });
               setTimeout(() => setCloudStatus('connected'), 1000);
-            } catch (err) {
-              setCloudStatus('error');
-              console.error('Delete error', err);
-            }
+            } catch (err) { setCloudStatus('error'); }
           }
         }
       };
@@ -636,11 +523,7 @@
       const startEditVac = (v) => { setEditVacId(v.id); setEditVacForm({ ...v }); };
       
       const saveEditVac = () => {
-        if (editVacForm.manualStatus === 'Promote&Transfer Done' && !editVacForm.effectiveDate) { 
-          alert('กรุณาระบุวันที่มีผล (Effective Date) สำหรับสถานะ Promote&Transfer Done'); 
-          return; 
-        }
-
+        if (editVacForm.manualStatus === 'Promote&Transfer Done' && !editVacForm.effectiveDate) { alert('กรุณาระบุวันที่มีผล (Effective Date) สำหรับสถานะ Promote&Transfer Done'); return; }
         const branch = appBranches.find(b => String(b.code) === String(editVacForm.branchCode));
         const newVacs = vacancies.map(v => String(v.id) === String(editVacId) ? { ...editVacForm, area: branch ? branch.area : v.area, branchName: branch ? branch.name : v.branchName } : v);
         setVacancies(newVacs); setEditVacId(null); syncToCloud(applicants, newVacs);
@@ -653,38 +536,16 @@
 
       const handleDownloadFile = (base64String, fileName) => {
         if (!base64String || base64String === 'Uploaded') return;
-        
-        if (String(base64String).startsWith('http')) {
-           window.open(base64String, '_blank');
-           return;
-        }
-
+        if (String(base64String).startsWith('http')) { window.open(base64String, '_blank'); return; }
         try {
-          const arr = base64String.split(',');
-          if (arr.length !== 2) return;
-          const mimeMatch = arr[0].match(/:(.*?);/);
-          if (!mimeMatch) return;
-          const mime = mimeMatch[1];
-          const bstr = atob(arr[1]);
-          let n = bstr.length;
-          const u8arr = new Uint8Array(n);
-          while (n--) {
-            u8arr[n] = bstr.charCodeAt(n);
-          }
-          const blob = new Blob([u8arr], { type: mime });
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.style.display = 'none';
-          a.href = url;
-          a.download = fileName || 'Resume';
-          document.body.appendChild(a);
-          a.click();
-          window.URL.revokeObjectURL(url);
-          a.remove();
-        } catch (error) {
-          console.error("Download error:", error);
-          alert("เกิดข้อผิดพลาดในการดาวน์โหลดไฟล์");
-        }
+          const arr = base64String.split(','); if (arr.length !== 2) return;
+          const mimeMatch = arr[0].match(/:(.*?);/); if (!mimeMatch) return;
+          const mime = mimeMatch[1]; const bstr = atob(arr[1]); let n = bstr.length; const u8arr = new Uint8Array(n);
+          while (n--) { u8arr[n] = bstr.charCodeAt(n); }
+          const blob = new Blob([u8arr], { type: mime }); const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a'); a.style.display = 'none'; a.href = url; a.download = fileName || 'Resume';
+          document.body.appendChild(a); a.click(); window.URL.revokeObjectURL(url); a.remove();
+        } catch (error) { alert("เกิดข้อผิดพลาดในการดาวน์โหลดไฟล์"); }
       };
 
       const availableBranchesForAreas = appBranches.filter(b => selectedAreas.includes(b.area));
@@ -709,27 +570,16 @@
         let computedStatus = v.manualStatus;
         
         if (v.manualStatus !== 'Closed') {
-          let hasHired = false;
-          let hasWaitingToJoin = false;
-          let hasHealthCheck = false;
-          
-          const today = new Date();
-          today.setHours(0,0,0,0);
+          let hasHired = false, hasWaitingToJoin = false, hasHealthCheck = false;
+          const today = new Date(); today.setHours(0,0,0,0);
 
           matchedApplicants.forEach(app => {
             if (app.status === 'ผ่านสัมภาษณ์') hasHired = true;
             if (app.status === 'รอเริ่มงาน') {
               if (app.startDate) {
-                const sDate = new Date(app.startDate);
-                sDate.setHours(0,0,0,0);
-                if (today >= sDate) {
-                  hasHired = true;
-                } else {
-                  hasWaitingToJoin = true; 
-                }
-              } else {
-                hasWaitingToJoin = true;
-              }
+                const sDate = new Date(app.startDate); sDate.setHours(0,0,0,0);
+                if (today >= sDate) hasHired = true; else hasWaitingToJoin = true; 
+              } else hasWaitingToJoin = true;
             }
             if (app.status === 'ตรวจสุขภาพ') hasHealthCheck = true;
           });
@@ -740,14 +590,8 @@
         }
         
         let slaEndTime = Date.now();
-        const hiredApps = matchedApplicants.filter(app => {
-          return ['ผ่านสัมภาษณ์', 'รอเริ่มงาน'].includes(app.status);
-        });
-
-        if (hiredApps.length > 0) {
-          slaEndTime = Math.min(...hiredApps.map(a => parseDateToMs(a.updatedAt) || parseDateToMs(a.timestamp) || parseDateToMs(a.id) || Date.now()));
-        }
-
+        const hiredApps = matchedApplicants.filter(app => { return ['ผ่านสัมภาษณ์', 'รอเริ่มงาน'].includes(app.status); });
+        if (hiredApps.length > 0) { slaEndTime = Math.min(...hiredApps.map(a => parseDateToMs(a.updatedAt) || parseDateToMs(a.timestamp) || parseDateToMs(a.id) || Date.now())); }
         let startMs = parseDateToMs(v.createdAt) || parseDateToMs(v.timestamp) || parseDateToMs(v.id) || Date.now();
         const slaDays = Math.max(0, Math.floor((slaEndTime - startMs) / (1000 * 60 * 60 * 24))) || 0;
         return { applicantCount, computedStatus, slaDays, matchedApplicants };
@@ -806,27 +650,17 @@
 
       const vacancyStats = useMemo(() => {
         let total = dashboardVacancies.length;
-        let vacant = 0;
-        let promoteTransfer = 0;
-        let hold = 0;
-        let fulfilled = 0;
+        let vacant = 0, promoteTransfer = 0, hold = 0, fulfilled = 0;
 
         dashboardVacancies.forEach(v => {
           const { computedStatus } = getVacancyInsights(v);
-          if (computedStatus === 'Vacant') {
-            vacant++;
-          } else if (computedStatus === 'Promote&Transfer') {
-            promoteTransfer++;
-            fulfilled++; 
-          } else if (computedStatus === 'Hold') {
-            hold++;
-          } else if (['Hired', 'Waiting to Join', 'Promote&Transfer Done'].includes(computedStatus)) {
-            fulfilled++;
-          }
+          if (computedStatus === 'Vacant') { vacant++; } 
+          else if (computedStatus === 'Promote&Transfer') { promoteTransfer++; fulfilled++; } 
+          else if (computedStatus === 'Hold') { hold++; } 
+          else if (['Hired', 'Waiting to Join', 'Promote&Transfer Done'].includes(computedStatus)) { fulfilled++; }
         });
 
         const progress = total > 0 ? Math.round((fulfilled / total) * 100) : 0;
-
         return { total, vacant, promoteTransfer, hold, fulfilled, progress };
       }, [dashboardVacancies, applicants]); 
 
@@ -839,6 +673,47 @@
 
       const dashboardData = useMemo(() => dashboardTA === 'ALL' ? applicants : applicants.filter(app => String(app.ta) === String(dashboardTA)), [applicants, dashboardTA]);
       
+      // 💬 ฟังก์ชัน: สรุปและส่งข้อมูลไปแจ้งเตือนในกลุ่ม LINE
+      const sendLineSummary = async () => {
+        if (!lineToken) {
+          alert('กรุณาตั้งค่า LINE Token ในเมนูตั้งค่า (รูปฟันเฟืองมุมขวาบน) ก่อนการใช้งานครับ');
+          setShowSettings(true);
+          return;
+        }
+        if (!window.confirm('ต้องการส่งสรุปข้อมูลชุดนี้ไปยัง LINE Notify ใช่หรือไม่?')) return;
+        
+        setIsSendingLine(true);
+        const filteredAppsData = dashboardTA === 'ALL' ? applicants : applicants.filter(app => String(app.ta) === String(dashboardTA));
+        const hiredCount = filteredAppsData.filter(a => ['ผ่านสัมภาษณ์', 'รอเริ่มงาน'].includes(a.status)).length;
+        const pendingCount = filteredAppsData.filter(a => ['รอพิจารณาประวัติ', 'รอผลสัมภาษณ์', 'อยู่ระหว่างนัดสัมภาษณ์', 'สำรอง/เก็บไว้พิจารณา', 'ตรวจสุขภาพ'].includes(a.status)).length;
+
+        const summaryMsg = `\n📊 สรุปรายงานการสรรหาบุคลากร\n` +
+                           `👤 ผู้ดูแล: ${dashboardTA}\n` +
+                           `-- ตำแหน่งงาน (Vacancies) --\n` +
+                           `📍 เปิดรับทั้งหมด: ${vacancyStats.total} อัตรา\n` +
+                           `🟢 ได้คนแล้ว: ${vacancyStats.fulfilled} อัตรา (${vacancyStats.progress}%)\n` +
+                           `🔴 ยังว่าง: ${vacancyStats.vacant} อัตรา\n\n` +
+                           `-- ข้อมูลผู้สมัคร (Applicants) --\n` +
+                           `👥 ผู้สมัครรวม: ${filteredAppsData.length} คน\n` +
+                           `✅ สำเร็จ/รอเริ่มงาน: ${hiredCount} คน\n` +
+                           `⏳ รอดำเนินการ: ${pendingCount} คน\n` +
+                           `---\n🕒 อัปเดตล่าสุด: ${getConsistentTimestamp()}`;
+
+        try {
+          await fetch(GOOGLE_SCRIPT_URL, {
+            method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: 'sendLineNotify', lineToken: lineToken, message: summaryMsg })
+          });
+          setTimeout(() => {
+             alert('ส่งแจ้งเตือนเข้า LINE สำเร็จ!');
+             setIsSendingLine(false);
+          }, 1000);
+        } catch (error) {
+          alert('เกิดข้อผิดพลาดในการส่ง LINE Notify');
+          setIsSendingLine(false);
+        }
+      };
+
       const branchProgressData = useMemo(() => {
         let filteredVacs = dashboardVacancies;
         if (dashboardAreaFilter) filteredVacs = filteredVacs.filter(v => v.area === dashboardAreaFilter);
@@ -860,12 +735,7 @@
         filteredVacs.forEach(v => {
             if (!branchMap[v.branchCode]) {
                 branchMap[v.branchCode] = {
-                    branchCode: v.branchCode,
-                    branchName: v.branchName,
-                    area: v.area,
-                    totalVacancies: 0,
-                    fulfilledVacancies: 0,
-                    applicantCount: 0
+                    branchCode: v.branchCode, branchName: v.branchName, area: v.area, totalVacancies: 0, fulfilledVacancies: 0, applicantCount: 0
                 };
             }
             branchMap[v.branchCode].totalVacancies++;
@@ -874,28 +744,20 @@
             let computedStatus = v.manualStatus;
             
             if (v.manualStatus !== 'Closed') {
-                let hasHired = false;
-                let hasWaitingToJoin = false;
-                
-                const today = new Date();
-                today.setHours(0,0,0,0);
+                let hasHired = false, hasWaitingToJoin = false;
+                const today = new Date(); today.setHours(0,0,0,0);
 
                 matchedApps.forEach(app => {
                     if (app.status === 'ผ่านสัมภาษณ์') hasHired = true;
                     if (app.status === 'รอเริ่มงาน') {
                         if (app.startDate) {
-                            const sDate = new Date(app.startDate);
-                            sDate.setHours(0,0,0,0);
-                            if (today >= sDate) hasHired = true;
-                            else hasWaitingToJoin = true;
-                        } else {
-                            hasWaitingToJoin = true;
-                        }
+                            const sDate = new Date(app.startDate); sDate.setHours(0,0,0,0);
+                            if (today >= sDate) hasHired = true; else hasWaitingToJoin = true;
+                        } else { hasWaitingToJoin = true; }
                     }
                 });
 
-                if (hasHired) computedStatus = 'Hired';
-                else if (hasWaitingToJoin) computedStatus = 'Waiting to Join';
+                if (hasHired) computedStatus = 'Hired'; else if (hasWaitingToJoin) computedStatus = 'Waiting to Join';
             }
 
             if (['Hired', 'Waiting to Join', 'Promote&Transfer Done', 'Promote&Transfer'].includes(computedStatus)) {
@@ -907,12 +769,8 @@
             if (!branchMap[a.branchCode]) {
                 const b = appBranches.find(br => String(br.code) === String(a.branchCode));
                 branchMap[a.branchCode] = {
-                    branchCode: a.branchCode,
-                    branchName: a.branchName || (b ? b.name : a.branchCode),
-                    area: b ? b.area : 'Unknown',
-                    totalVacancies: 0,
-                    fulfilledVacancies: 0,
-                    applicantCount: 0
+                    branchCode: a.branchCode, branchName: a.branchName || (b ? b.name : a.branchCode),
+                    area: b ? b.area : 'Unknown', totalVacancies: 0, fulfilledVacancies: 0, applicantCount: 0
                 };
             }
             branchMap[a.branchCode].applicantCount++;
@@ -921,13 +779,8 @@
         return Object.values(branchMap).sort((a, b) => {
             const progressA = a.totalVacancies > 0 ? (a.fulfilledVacancies / a.totalVacancies) : 0;
             const progressB = b.totalVacancies > 0 ? (b.fulfilledVacancies / b.totalVacancies) : 0;
-            
-            if (progressB !== progressA) {
-                return progressB - progressA;
-            }
-            if (b.fulfilledVacancies !== a.fulfilledVacancies) {
-                return b.fulfilledVacancies - a.fulfilledVacancies;
-            }
+            if (progressB !== progressA) return progressB - progressA;
+            if (b.fulfilledVacancies !== a.fulfilledVacancies) return b.fulfilledVacancies - a.fulfilledVacancies;
             if (a.area !== b.area) return String(a.area).localeCompare(String(b.area));
             return String(a.branchName).localeCompare(String(b.branchName));
         });
@@ -977,76 +830,92 @@
         <div className="min-h-screen font-sans text-slate-800 pb-10 relative">
           {isLoading && (
             <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center transition-all">
-              <div className="bg-white px-8 py-6 rounded-2xl shadow-xl flex flex-col items-center space-y-4 animate-in fade-in zoom-in duration-300">
+              <div className="bg-white px-8 py-6 rounded-3xl shadow-2xl flex flex-col items-center space-y-4 animate-in fade-in zoom-in duration-300">
                 <div className="animate-spin w-12 h-12 border-4 border-blue-100 border-t-blue-600 rounded-full"></div>
-                <span className="font-bold text-slate-700 text-lg">กำลังเชื่อมต่อข้อมูล...</span>
+                <span className="font-bold text-slate-700 text-lg">กำลังซิงค์ข้อมูล...</span>
               </div>
             </div>
           )}
 
-          <nav className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between h-auto md:h-16 py-3 md:py-0">
-              <div className="flex items-center space-x-3 mb-3 md:mb-0">
-                <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white"><Users size={20} /></div>
-                <span className="text-xl font-bold text-slate-900 tracking-tight">HR <span className="text-blue-600">Recruit</span></span>
+          {/* ปรับโฉม Navigation Bar ให้ดูหรูขึ้นแบบ Glassmorphism */}
+          <nav className="glass-effect border-b border-slate-200/50 sticky top-0 z-30 shadow-sm transition-all duration-300">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center h-auto md:h-16 py-3 md:py-0">
+              <div className="flex items-center space-x-3 mb-3 md:mb-0 w-full md:w-auto justify-center md:justify-start">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 shadow-blue-500/30 shadow-lg flex items-center justify-center text-white"><Users size={20} /></div>
+                <span className="text-xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-slate-900 to-slate-600 tracking-tight">HR <span className="text-blue-600">Recruit</span></span>
               </div>
-              <div className="flex items-center justify-between overflow-x-auto w-full md:w-auto space-x-4 hide-scrollbar">
-                <div className="flex space-x-1 bg-slate-100/80 p-1 rounded-xl whitespace-nowrap">
-                  <button onClick={() => setActiveTab('area_hr')} className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg text-sm font-medium ${activeTab === 'area_hr' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}><Briefcase size={16} /><span>Area HR (เปิดงาน)</span></button>
-                  <button onClick={() => setActiveTab('entry')} className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg text-sm font-medium ${activeTab === 'entry' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}><UserPlus size={16} /><span>Recruit (คีย์คน)</span></button>
-                  <button onClick={() => setActiveTab('dashboard')} className={`flex items-center space-x-2 px-4 py-1.5 rounded-lg text-sm font-medium ${activeTab === 'dashboard' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}><BarChart3 size={16} /><span>Dashboard</span></button>
+              <div className="flex flex-col sm:flex-row items-center w-full md:w-auto space-y-3 sm:space-y-0 sm:space-x-4">
+                <div className="flex space-x-1 bg-slate-100/80 p-1 rounded-2xl whitespace-nowrap shadow-inner border border-slate-200/60 overflow-x-auto w-full sm:w-auto hide-scrollbar justify-start sm:justify-center">
+                  <button onClick={() => setActiveTab('area_hr')} className={`flex flex-1 sm:flex-none items-center justify-center space-x-2 px-4 py-2 rounded-xl text-sm font-bold transition-all duration-300 ${activeTab === 'area_hr' ? 'bg-white text-blue-700 shadow-md ring-1 ring-slate-900/5' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}><Briefcase size={16} /><span>Area HR</span></button>
+                  <button onClick={() => setActiveTab('entry')} className={`flex flex-1 sm:flex-none items-center justify-center space-x-2 px-4 py-2 rounded-xl text-sm font-bold transition-all duration-300 ${activeTab === 'entry' ? 'bg-white text-blue-700 shadow-md ring-1 ring-slate-900/5' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}><UserPlus size={16} /><span>Recruit</span></button>
+                  <button onClick={() => setActiveTab('dashboard')} className={`flex flex-1 sm:flex-none items-center justify-center space-x-2 px-4 py-2 rounded-xl text-sm font-bold transition-all duration-300 ${activeTab === 'dashboard' ? 'bg-white text-blue-700 shadow-md ring-1 ring-slate-900/5' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}><BarChart3 size={16} /><span>Dashboard</span></button>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <div className="hidden md:flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-50 border border-slate-200">
+                <div className="flex items-center space-x-2 w-full sm:w-auto justify-end">
+                  <div className="hidden lg:flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white shadow-sm border border-slate-200">
                     {cloudStatus === 'loading' && <><div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div><span className="text-slate-600">กำลังเชื่อมต่อ</span></>}
                     {cloudStatus === 'connected' && <><div className="w-2 h-2 bg-emerald-500 rounded-full"></div><span className="text-emerald-700">ออนไลน์</span></>}
                     {cloudStatus === 'syncing' && <><div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div><span className="text-blue-700">ซิงค์...</span></>}
                     {cloudStatus === 'error' && <><div className="w-2 h-2 bg-red-500 rounded-full"></div><span className="text-red-700">ออฟไลน์</span></>}
                   </div>
-                  <button onClick={() => setShowSettings(true)} className="flex items-center space-x-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 px-3 py-2 rounded-lg text-sm font-semibold border"><Settings size={16}/><span className="hidden sm:inline">ตั้งค่า</span></button>
+                  <button onClick={() => setShowSettings(true)} className="flex flex-1 sm:flex-none items-center justify-center space-x-1.5 bg-white text-slate-700 hover:text-blue-700 hover:bg-blue-50 px-3 py-2 rounded-xl text-sm font-bold shadow-sm border border-slate-200 transition-colors"><Settings size={16}/><span className="inline">ตั้งค่า</span></button>
                 </div>
               </div>
             </div>
           </nav>
 
-          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in slide-in-from-bottom-4 duration-500">
             {/* Tab: Area HR */}
             {activeTab === 'area_hr' && (
               <div className="space-y-6">
-                <div className="bg-white rounded-2xl shadow-sm border p-6">
-                  <div className="mb-4 flex items-center justify-between">
-                    <h2 className="text-lg font-bold flex items-center space-x-2"><Map className="text-blue-600" size={22} /><span>เลือก Area</span></h2>
+                <div className="bg-white rounded-3xl shadow-sm hover:shadow-md transition-shadow border border-slate-200 p-6">
+                  <div className="mb-5 flex items-center justify-between">
+                    <h2 className="text-xl font-bold flex items-center space-x-2 text-slate-800"><Map className="text-blue-600" size={24} /><span>เลือก Area ที่ต้องการจัดการ</span></h2>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
                     {appAreas.map(area => (
-                      <button key={area} onClick={() => toggleArea(area)} className={`w-full px-3 py-2.5 rounded-xl text-sm font-bold border transition-all truncate ${selectedAreas.includes(area) ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-[1.02]' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400 hover:bg-blue-50'}`}>{area}</button>
+                      <button key={area} onClick={() => toggleArea(area)} className={`w-full px-4 py-3 rounded-2xl text-sm font-bold border transition-all duration-200 truncate ${selectedAreas.includes(area) ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-transparent shadow-lg shadow-blue-500/30 transform scale-[1.03]' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700 hover:-translate-y-0.5'}`}>{area}</button>
                     ))}
                   </div>
                 </div>
 
                 {selectedAreas.length > 0 && (
-                  <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
-                    <div className="bg-slate-50/50 border-b px-6 py-4 flex items-center space-x-3">
-                      <div className="bg-blue-100 text-blue-600 p-2 rounded-lg"><Target size={20}/></div>
-                      <h2 className="font-bold">เปิดตำแหน่งงานว่างใหม่</h2>
+                  <div className="bg-white rounded-3xl shadow-sm hover:shadow-md transition-shadow border border-slate-200 overflow-hidden">
+                    <div className="bg-slate-50/80 border-b px-6 py-5 flex items-center space-x-3">
+                      <div className="bg-gradient-to-br from-blue-100 to-indigo-100 text-blue-700 p-2.5 rounded-xl shadow-inner"><Target size={20}/></div>
+                      <h2 className="font-extrabold text-lg text-slate-800">เปิดตำแหน่งงานว่างใหม่</h2>
                     </div>
-                    <form onSubmit={handleVacancySubmit} className="p-6 space-y-4">
+                    <form onSubmit={handleVacancySubmit} className="p-6 space-y-5">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <select required name="branchCode" value={vacancyForm.branchCode} onChange={handleVacancyInputChange} className="w-full border rounded-xl px-4 py-2.5 outline-none focus:border-blue-500">
-                          <option value="">-- เลือกสาขา --</option>
-                          <option value="">-- เลือกตำแหน่งงาน --</option>
-                          {uniquePositionNames.map(pos => <option key={pos} value={pos}>{pos}</option>)}
-                        </select>
-                        <select required name="manualStatus" value={vacancyForm.manualStatus} onChange={handleVacancyInputChange} className="w-full border rounded-xl px-4 py-2.5 outline-none focus:border-blue-500">
-                          {VACANCY_STATUSES.filter(s => s !== 'Closed').map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-slate-500 ml-1">เลือกสาขา</label>
+                          <select required name="branchCode" value={vacancyForm.branchCode} onChange={handleVacancyInputChange} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold text-slate-700 outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 transition-all">
+                            <option value="">-- เลือกสาขา --</option>
+                            {availableBranchesForAreas.map(b => <option key={b.code} value={b.code}>{b.name} ({b.area})</option>)}
+                          </select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-slate-500 ml-1">ตำแหน่งที่เปิดรับ</label>
+                          <select required name="position" value={vacancyForm.position} onChange={handleVacancyInputChange} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold text-slate-700 outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 transition-all">
+                            <option value="">-- เลือกตำแหน่งงาน --</option>
+                            {uniquePositionNames.map(pos => <option key={pos} value={pos}>{pos}</option>)}
+                          </select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-slate-500 ml-1">สถานะเริ่มต้น</label>
+                          <select required name="manualStatus" value={vacancyForm.manualStatus} onChange={handleVacancyInputChange} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold text-slate-700 outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 transition-all">
+                            {VACANCY_STATUSES.filter(s => s !== 'Closed').map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        </div>
                         {vacancyForm.manualStatus === 'Promote&Transfer Done' && (
-                          <input required type="date" name="effectiveDate" value={vacancyForm.effectiveDate || ''} onChange={handleVacancyInputChange} className="w-full border rounded-xl px-4 py-2.5 outline-none focus:border-emerald-500 border-emerald-300 bg-emerald-50" title="วันที่มีผล" />
+                          <div className="space-y-1.5 md:col-start-3">
+                            <label className="text-xs font-bold text-emerald-600 ml-1">ระบุวันที่มีผล (Effective Date)</label>
+                            <input required type="date" name="effectiveDate" value={vacancyForm.effectiveDate || ''} onChange={handleVacancyInputChange} className="w-full border border-emerald-300 bg-emerald-50 rounded-2xl px-4 py-3 text-sm font-semibold text-slate-700 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/20 transition-all" />
+                          </div>
                         )}
                       </div>
-                      <div className="flex justify-end">
-                        <button type="submit" className="bg-slate-800 text-white py-2.5 px-6 rounded-xl flex items-center space-x-2">
-                          <Briefcase size={16}/><span>บันทึกตำแหน่ง</span>
+                      <div className="flex justify-end pt-2">
+                        <button type="submit" className="bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 px-8 rounded-2xl shadow-lg shadow-slate-900/20 hover:-translate-y-0.5 transition-all flex items-center space-x-2">
+                          <Briefcase size={18}/><span>สร้างตำแหน่งงานใหม่</span>
                         </button>
                       </div>
                     </form>
@@ -1054,133 +923,125 @@
                 )}
 
                 {selectedAreas.length > 0 && (
-                  <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
-                    <div className="px-6 py-4 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                      <h3 className="font-bold text-lg">รายการตำแหน่งงาน (Job Vacancies)</h3>
-                      <div className="flex items-center w-full sm:w-auto space-x-3">
+                  <div className="bg-white rounded-3xl shadow-sm hover:shadow-md transition-shadow border border-slate-200 overflow-hidden">
+                    <div className="px-6 py-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50/50">
+                      <h3 className="font-extrabold text-lg text-slate-800 flex items-center"><Search size={20} className="mr-2 text-slate-400"/>รายการตำแหน่งงานที่เปิดรับ</h3>
+                      <div className="flex flex-wrap items-center w-full sm:w-auto gap-3">
                         <div className="relative flex-1 sm:w-48">
                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                              <Building2 size={14} className="text-slate-400" />
                            </div>
-                           <select
-                             value={vacancyBranchFilter}
-                             onChange={(e) => setVacancyBranchFilter(e.target.value)}
-                             className="w-full pl-9 pr-4 py-2.5 border rounded-lg text-sm outline-none focus:border-blue-500 bg-slate-50 hover:bg-slate-100 transition-colors appearance-none font-medium text-slate-700 truncate"
-                           >
+                           <select value={vacancyBranchFilter} onChange={(e) => setVacancyBranchFilter(e.target.value)} className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 bg-white hover:bg-slate-50 transition-colors appearance-none truncate">
                              <option value="">ทุกสาขา</option>
-                             {availableBranchesForAreas.map(b => (
-                               <option key={b.code} value={b.code}>{b.name}</option>
-                             ))}
+                             {availableBranchesForAreas.map(b => (<option key={b.code} value={b.code}>{b.name}</option>))}
                            </select>
                         </div>
-                        <div className="relative flex-1 sm:w-64">
+                        <div className="relative flex-1 sm:w-56">
                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                              <Filter size={14} className="text-slate-400" />
                            </div>
-                           <select
-                             value={vacancyPositionFilter}
-                             onChange={(e) => setVacancyPositionFilter(e.target.value)}
-                             className="w-full pl-9 pr-4 py-2.5 border rounded-lg text-sm outline-none focus:border-blue-500 bg-slate-50 hover:bg-slate-100 transition-colors appearance-none font-medium text-slate-700"
-                           >
+                           <select value={vacancyPositionFilter} onChange={(e) => setVacancyPositionFilter(e.target.value)} className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 bg-white hover:bg-slate-50 transition-colors appearance-none truncate">
                              <option value="">ทุกตำแหน่งงาน</option>
-                             {availableVacancyPositions.map(pos => (
-                               <option key={pos} value={pos}>{pos}</option>
-                             ))}
+                             {availableVacancyPositions.map(pos => (<option key={pos} value={pos}>{pos}</option>))}
                            </select>
                         </div>
-                        <button onClick={() => exportToExcel(filteredVacancies, 'Vacancies')} className="text-xs bg-emerald-50 text-emerald-700 px-4 py-2.5 rounded-lg border font-bold flex items-center shrink-0 hover:bg-emerald-100 transition-colors shadow-sm">
-                          <Download size={14} className="mr-1.5"/>Export
+                        <button onClick={() => exportToExcel(filteredVacancies, 'Vacancies')} className="text-sm bg-white text-slate-600 px-4 py-2 rounded-xl border border-slate-200 font-bold flex items-center shrink-0 hover:bg-slate-50 hover:text-emerald-600 hover:border-emerald-200 transition-all shadow-sm">
+                          <Download size={16} className="mr-2"/>Export
                         </button>
                       </div>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm text-left whitespace-nowrap">
-                        <thead className="bg-slate-50 border-b">
+                        <thead className="bg-white border-b text-slate-500">
                           <tr>
-                            <th className="px-5 py-3">Area / สาขา</th>
-                            <th className="px-5 py-3">ตำแหน่งงาน</th>
-                            <th className="px-5 py-3 text-center">SLA</th>
-                            <th className="px-5 py-3 text-center">ผู้สมัคร</th>
-                            <th className="px-5 py-3">สถานะงาน</th>
-                            <th className="px-5 py-3 text-right">จัดการ</th>
+                            <th className="px-6 py-4 font-bold">Area / สาขา</th>
+                            <th className="px-6 py-4 font-bold">ตำแหน่งงาน</th>
+                            <th className="px-6 py-4 font-bold text-center">SLA (วัน)</th>
+                            <th className="px-6 py-4 font-bold text-center">ผู้สมัคร</th>
+                            <th className="px-6 py-4 font-bold">สถานะงาน</th>
+                            <th className="px-6 py-4 font-bold text-right">จัดการ</th>
                           </tr>
                         </thead>
-                        <tbody>
+                        <tbody className="divide-y divide-slate-100">
                           {filteredVacancies.map((v) => {
                             if (editVacId === v.id) {
                               return (
-                                <tr key={v.id} className="bg-blue-50">
-                                  <td className="p-3">
-                                    <select value={editVacForm.branchCode} onChange={e=>setEditVacForm({...editVacForm, branchCode:e.target.value})} className="w-full border p-1.5 rounded">
+                                <tr key={v.id} className="bg-blue-50/50">
+                                  <td className="p-4">
+                                    <select value={editVacForm.branchCode} onChange={e=>setEditVacForm({...editVacForm, branchCode:e.target.value})} className="w-full border-slate-300 shadow-sm p-2 rounded-xl text-sm font-semibold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
                                       {availableBranchesForAreas.map(b=><option key={b.code} value={b.code}>{b.name}</option>)}
                                     </select>
                                   </td>
-                                  <td className="p-3">
-                                    <select value={editVacForm.position} onChange={e=>setEditVacForm({...editVacForm, position:e.target.value})} className="w-full border p-1.5 rounded">
+                                  <td className="p-4">
+                                    <select value={editVacForm.position} onChange={e=>setEditVacForm({...editVacForm, position:e.target.value})} className="w-full border-slate-300 shadow-sm p-2 rounded-xl text-sm font-semibold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20">
                                       {uniquePositionNames.map(pos=><option key={pos} value={pos}>{pos}</option>)}
                                     </select>
                                   </td>
-                                  <td className="p-3 text-center">-</td>
-                                  <td className="p-3 text-center">-</td>
-                                  <td className="p-3 min-w-[180px]">
-                                    <select value={editVacForm.manualStatus} onChange={e=>setEditVacForm({...editVacForm, manualStatus:e.target.value})} className="w-full border p-1.5 rounded outline-none focus:border-blue-500">
+                                  <td className="p-4 text-center text-slate-400">-</td>
+                                  <td className="p-4 text-center text-slate-400">-</td>
+                                  <td className="p-4 min-w-[200px]">
+                                    <select value={editVacForm.manualStatus} onChange={e=>setEditVacForm({...editVacForm, manualStatus:e.target.value})} className="w-full border-slate-300 shadow-sm p-2 rounded-xl text-sm font-bold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 mb-2">
                                       {VACANCY_STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
                                     </select>
                                     {editVacForm.manualStatus === 'Promote&Transfer Done' && (
-                                      <input type="date" value={editVacForm.effectiveDate || ''} onChange={e=>setEditVacForm({...editVacForm, effectiveDate:e.target.value})} className="w-full border border-emerald-400 bg-emerald-50 p-1.5 rounded mt-1.5 text-xs outline-none focus:border-emerald-600 block" title="วันที่มีผล" />
+                                      <input type="date" value={editVacForm.effectiveDate || ''} onChange={e=>setEditVacForm({...editVacForm, effectiveDate:e.target.value})} className="w-full border-emerald-300 bg-emerald-50 text-emerald-700 shadow-sm p-2 rounded-xl text-xs font-bold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20" title="วันที่มีผล" />
                                     )}
                                   </td>
-                                  <td className="p-3 text-right whitespace-nowrap min-w-[130px] align-top">
-                                    <button onClick={saveEditVac} className="bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded text-xs mr-2 font-medium">บันทึก</button>
-                                    <button onClick={()=>setEditVacId(null)} className="bg-slate-200 text-slate-700 px-3 py-1.5 rounded text-xs font-medium">ยกเลิก</button>
+                                  <td className="p-4 text-right whitespace-nowrap min-w-[140px] align-top space-x-2">
+                                    <button onClick={saveEditVac} className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-colors">บันทึก</button>
+                                    <button onClick={()=>setEditVacId(null)} className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-colors">ยกเลิก</button>
                                   </td>
                                 </tr>
                               )
                             }
                             const { applicantCount, computedStatus, slaDays, matchedApplicants } = getVacancyInsights(v);
                             return (
-                              <tr key={v.id} className="hover:bg-slate-50 border-b">
-                                <td className="px-5 py-4">
-                                  <div className="text-xs text-blue-600 font-bold">{v.area}</div>
-                                  <div className="font-semibold">{v.branchName}</div>
+                              <tr key={v.id} className="hover:bg-slate-50 transition-colors group">
+                                <td className="px-6 py-4">
+                                  <div className="text-xs text-blue-600 font-extrabold uppercase tracking-wider mb-0.5">{v.area}</div>
+                                  <div className="font-bold text-slate-800">{v.branchName}</div>
                                 </td>
-                                <td className="px-5 py-4 font-bold cursor-pointer hover:text-blue-600 group" onClick={()=>startEditVac(v)}>
-                                  {v.position} <Edit size={12} className="inline opacity-0 group-hover:opacity-100"/>
+                                <td className="px-6 py-4 font-bold text-slate-700 cursor-pointer hover:text-blue-600" onClick={()=>startEditVac(v)}>
+                                  {v.position} <Edit size={14} className="inline opacity-0 group-hover:opacity-100 transition-opacity ml-1 text-blue-500"/>
                                 </td>
-                                <td className={`px-5 py-4 text-center font-black text-lg ${slaDays > 30 ? 'text-red-500' : ''}`}>
-                                  {slaDays}<span className="text-[10px] block font-normal text-slate-500">วัน</span>
+                                <td className={`px-6 py-4 text-center font-black text-xl ${slaDays > 30 ? 'text-red-500' : 'text-slate-700'}`}>
+                                  {slaDays}<span className="text-[10px] font-bold text-slate-400 block -mt-1">DAYS</span>
                                 </td>
-                                <td className="px-5 py-4 text-center">
-                                  <button onClick={()=>setViewApplicants({position:v.position, branchName:v.branchName, list:[...matchedApplicants].sort((a,b)=>b.updatedAt - a.updatedAt)})} disabled={applicantCount===0} className={`w-8 h-8 rounded-lg font-bold border ${applicantCount>0?'bg-blue-50 text-blue-700 hover:bg-blue-100':'bg-slate-50 text-slate-400'}`}>
+                                <td className="px-6 py-4 text-center">
+                                  <button onClick={()=>setViewApplicants({position:v.position, branchName:v.branchName, list:[...matchedApplicants].sort((a,b)=>b.updatedAt - a.updatedAt)})} disabled={applicantCount===0} className={`w-10 h-10 rounded-2xl font-black text-base shadow-sm transition-all ${applicantCount>0?'bg-blue-100 text-blue-700 hover:bg-blue-600 hover:text-white hover:shadow-blue-500/30 hover:-translate-y-0.5':'bg-slate-100 text-slate-400 opacity-50'}`}>
                                     {applicantCount}
                                   </button>
                                 </td>
-                                <td className="px-5 py-4">
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <span className="px-2.5 py-1 rounded-full text-xs font-bold inline-block" style={{backgroundColor:VACANCY_COLORS[computedStatus]+'15', color:VACANCY_COLORS[computedStatus]}}>
+                                <td className="px-6 py-4">
+                                  <div className="flex flex-col items-start gap-2">
+                                    <span className="px-3 py-1.5 rounded-xl text-xs font-extrabold shadow-sm border" style={{backgroundColor:VACANCY_COLORS[computedStatus]+'15', color:VACANCY_COLORS[computedStatus], borderColor:VACANCY_COLORS[computedStatus]+'30'}}>
                                       {computedStatus}
                                     </span>
                                     {computedStatus === 'Hired' && v.manualStatus !== 'Closed' && (
-                                      <button onClick={() => closeVacancy(v.id)} className="flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors animate-pulse shadow-sm border border-amber-200" title="ได้คนแล้ว คลิ๊กเพื่อปิดสถานะงาน">
-                                        <BellRing size={12} className="mr-1"/> แจ้งเตือน: ปิดงาน
+                                      <button onClick={() => closeVacancy(v.id)} className="flex items-center px-3 py-1.5 rounded-xl text-[10px] font-extrabold bg-amber-100 text-amber-700 hover:bg-amber-500 hover:text-white transition-all shadow-sm border border-amber-200 animate-pulse" title="ได้คนแล้ว คลิ๊กเพื่อปิดสถานะงาน">
+                                        <BellRing size={12} className="mr-1.5"/> ปิด Job นี้
                                       </button>
                                     )}
+                                    {computedStatus === 'Promote&Transfer Done' && v.effectiveDate && (
+                                      <div className="text-[10px] text-emerald-600 font-bold flex items-center"><Clock size={10} className="mr-1"/> มีผล: {new Date(v.effectiveDate).toLocaleDateString('th')}</div>
+                                    )}
                                   </div>
-                                  {computedStatus === 'Promote&Transfer Done' && v.effectiveDate && (
-                                    <div className="text-[10px] text-emerald-600 mt-1.5 font-bold">วันที่มีผล: {new Date(v.effectiveDate).toLocaleDateString('th')}</div>
-                                  )}
                                 </td>
-                                <td className="px-5 py-4 text-right space-x-2">
-                                  <button onClick={()=>startEditVac(v)} className="p-1.5 text-slate-400 hover:text-blue-600"><Edit size={16}/></button>
-                                  <button onClick={()=>deleteVacancy(v.id)} className="p-1.5 text-slate-400 hover:text-red-600"><Trash2 size={16}/></button>
+                                <td className="px-6 py-4 text-right space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button onClick={()=>startEditVac(v)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"><Edit size={18}/></button>
+                                  <button onClick={()=>deleteVacancy(v.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={18}/></button>
                                 </td>
                               </tr>
                             )
                           })}
                           {filteredVacancies.length === 0 && (
                             <tr>
-                              <td colSpan="6" className="px-5 py-8 text-center text-slate-400 font-medium">
-                                ไม่พบข้อมูลตำแหน่งงานที่ตรงกับเงื่อนไข
+                              <td colSpan="6" className="px-6 py-12 text-center">
+                                <div className="flex flex-col items-center justify-center text-slate-400">
+                                   <Search size={48} className="mb-3 text-slate-200"/>
+                                   <p className="font-bold text-lg text-slate-500">ยังไม่มีตำแหน่งงานว่าง</p>
+                                   <p className="text-sm">กรุณาสร้างตำแหน่งงานใหม่จากฟอร์มด้านบน</p>
+                                </div>
                               </td>
                             </tr>
                           )}
@@ -1194,26 +1055,29 @@
 
             {/* Tab: Recruit */}
             {activeTab === 'entry' && (
-              <div className="space-y-6">
-                <div className="bg-white rounded-2xl shadow-sm border p-6">
-                  <h2 className="text-lg font-bold flex items-center mb-4"><UserPlus className="text-blue-600 mr-2"/> เลือก TA (Recruiter)</h2>
-                  <select value={selectedTA} onChange={e=>setSelectedTA(e.target.value)} className="w-full md:w-1/2 border rounded-xl px-4 py-3 outline-none focus:border-blue-500">
-                    <option value="">-- ระบุ TA --</option>
+              <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+                <div className="bg-white rounded-3xl shadow-sm hover:shadow-md transition-shadow border border-slate-200 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <h2 className="text-xl font-bold flex items-center text-slate-800"><UserPlus className="text-blue-600 mr-2.5" size={24}/> เลือกผู้รับผิดชอบ (Recruiter)</h2>
+                  <select value={selectedTA} onChange={e=>setSelectedTA(e.target.value)} className="w-full sm:w-72 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 transition-all shadow-sm">
+                    <option value="">-- ระบุชื่อ TA --</option>
                     {appTAs.map(ta=><option key={ta} value={ta}>{ta}</option>)}
                   </select>
                 </div>
                 
                 {selectedTA && (
                   <>
-                    <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
-                      <div className="p-6 border-b flex flex-wrap gap-4 justify-between items-center bg-slate-50/50">
-                        <h3 className="font-bold text-lg">ตำแหน่งงานที่เปิดรับ (กรองตาม TA อัตโนมัติ)</h3>
-                        <div className="flex space-x-2">
-                          <select value={recruitAreaFilter} onChange={e=>{setRecruitAreaFilter(e.target.value);setRecruitBranchFilter('')}} className="border rounded-lg px-2 py-1.5 text-sm outline-none">
+                    <div className="bg-white rounded-3xl shadow-sm hover:shadow-md transition-shadow border border-slate-200 overflow-hidden">
+                      <div className="p-6 border-b border-slate-100 flex flex-wrap gap-4 justify-between items-center bg-slate-50/50">
+                        <div className="flex items-center space-x-3">
+                           <div className="bg-gradient-to-br from-indigo-100 to-purple-100 text-indigo-700 p-2.5 rounded-xl shadow-inner"><Target size={20}/></div>
+                           <h3 className="font-extrabold text-lg text-slate-800">งานที่รับผิดชอบ <span className="text-sm font-normal text-slate-500">(Auto-filtered)</span></h3>
+                        </div>
+                        <div className="flex space-x-3">
+                          <select value={recruitAreaFilter} onChange={e=>{setRecruitAreaFilter(e.target.value);setRecruitBranchFilter('')}} className="border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 shadow-sm">
                             <option value="">ทุก Area</option>
                             {appAreas.map(a=><option key={a}>{a}</option>)}
                           </select>
-                          <select value={recruitBranchFilter} onChange={e=>setRecruitBranchFilter(e.target.value)} disabled={!recruitAreaFilter} className="border rounded-lg px-2 py-1.5 text-sm outline-none">
+                          <select value={recruitBranchFilter} onChange={e=>setRecruitBranchFilter(e.target.value)} disabled={!recruitAreaFilter} className="border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 shadow-sm disabled:opacity-50">
                             <option value="">ทุกสาขา</option>
                             {branchesForRecruitFilter.map(b=><option key={b.code} value={b.code}>{b.name}</option>)}
                           </select>
@@ -1221,118 +1085,134 @@
                       </div>
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">
-                          <thead className="bg-white border-b">
+                          <thead className="bg-white border-b text-slate-500">
                             <tr>
-                              <th className="p-4">สาขา</th>
-                              <th className="p-4">ตำแหน่ง</th>
-                              <th className="p-4 text-center">รับแล้ว</th>
-                              <th className="p-4">สถานะหน้าบ้าน (Area HR)</th>
-                              <th className="p-4 text-right">ดำเนินการ</th>
+                              <th className="p-5 font-bold">สาขา</th>
+                              <th className="p-5 font-bold">ตำแหน่งเปิดรับ</th>
+                              <th className="p-5 font-bold text-center">รับแล้ว</th>
+                              <th className="p-5 font-bold">สถานะ (Area HR)</th>
+                              <th className="p-5 font-bold text-right">Action</th>
                             </tr>
                           </thead>
-                          <tbody>
+                          <tbody className="divide-y divide-slate-50">
                             {activeVacanciesForRecruit.map(v => {
                               const { applicantCount, computedStatus } = getVacancyInsights(v);
                               return (
-                                <tr key={v.id} className="border-b hover:bg-slate-50">
-                                  <td className="p-4">
-                                    <div className="text-xs font-bold text-blue-600">{v.area}</div>
-                                    <div className="font-semibold">{v.branchName}</div>
+                                <tr key={v.id} className="hover:bg-slate-50 transition-colors">
+                                  <td className="p-5">
+                                    <div className="text-[10px] font-extrabold text-indigo-600 uppercase tracking-wider mb-1">{v.area}</div>
+                                    <div className="font-bold text-slate-700">{v.branchName}</div>
                                   </td>
-                                  <td className="p-4 font-bold">{v.position}</td>
-                                  <td className="p-4 text-center">
-                                    <span className="px-2 py-1 border rounded bg-slate-50">{applicantCount}</span>
+                                  <td className="p-5 font-extrabold text-slate-800">{v.position}</td>
+                                  <td className="p-5 text-center">
+                                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl font-bold bg-slate-100 text-slate-600 shadow-inner">{applicantCount}</span>
                                   </td>
-                                  <td className="p-4">
-                                    <span className="px-2 py-1 rounded-full text-xs font-bold" style={{backgroundColor:VACANCY_COLORS[computedStatus]+'15', color:VACANCY_COLORS[computedStatus]}}>
+                                  <td className="p-5">
+                                    <span className="px-3 py-1.5 rounded-xl text-xs font-extrabold shadow-sm border" style={{backgroundColor:VACANCY_COLORS[computedStatus]+'15', color:VACANCY_COLORS[computedStatus], borderColor:VACANCY_COLORS[computedStatus]+'30'}}>
                                       {computedStatus}
                                     </span>
                                   </td>
-                                  <td className="p-4 text-right">
-                                    <button onClick={()=>setAddingApplicantFor(v)} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors">เพิ่มผู้สมัคร</button>
+                                  <td className="p-5 text-right">
+                                    <button onClick={()=>setAddingApplicantFor(v)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center ml-auto">
+                                      <UserPlus size={16} className="mr-2"/>เพิ่มประวัติ
+                                    </button>
                                   </td>
                                 </tr>
                               );
                             })}
+                            {activeVacanciesForRecruit.length === 0 && (
+                               <tr><td colSpan="5" className="p-10 text-center text-slate-400 font-medium">ไม่มีตำแหน่งงานที่เปิดรับสำหรับ TA ท่านนี้</td></tr>
+                            )}
                           </tbody>
                         </table>
                       </div>
                     </div>
 
-                    <div className="bg-white rounded-2xl shadow-sm border mt-6 overflow-hidden">
-                      <div className="p-5 border-b flex justify-between items-center">
-                        <h3 className="font-bold">ประวัติของคุณ</h3>
-                        <button onClick={()=>exportToExcel(myApplicants, 'MyApps')} className="text-xs border px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 flex items-center font-semibold">
-                          <Download size={14} className="mr-1"/> Export
+                    <div className="bg-white rounded-3xl shadow-sm hover:shadow-md transition-shadow border border-slate-200 mt-8 overflow-hidden">
+                      <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                        <div className="flex items-center space-x-3">
+                           <div className="bg-gradient-to-br from-emerald-100 to-teal-100 text-emerald-700 p-2.5 rounded-xl shadow-inner"><Users size={20}/></div>
+                           <h3 className="font-extrabold text-lg text-slate-800">ประวัติผู้สมัครที่ดูแล</h3>
+                        </div>
+                        <button onClick={()=>exportToExcel(myApplicants, 'MyApplicants_Export')} className="text-sm bg-white text-slate-600 px-4 py-2 rounded-xl border border-slate-200 font-bold flex items-center hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 transition-all shadow-sm">
+                          <Download size={16} className="mr-2"/> Export Excel
                         </button>
                       </div>
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">
-                          <tbody>
+                          <tbody className="divide-y divide-slate-100">
+                            {myApplicants.length === 0 && <tr><td colSpan="4" className="p-10 text-center text-slate-400 font-medium">ยังไม่มีประวัติผู้สมัคร</td></tr>}
                             {myApplicants.map(app => {
                               if (editAppId === app.id) return (
-                                <tr key={app.id} className="bg-blue-50/50">
-                                  <td className="p-3 font-semibold text-xs">{app.branchName}</td>
-                                  <td className="p-3 space-y-1">
-                                    <input value={editAppForm.name} onChange={e=>setEditAppForm({...editAppForm, name:e.target.value})} className="w-full border p-1.5 text-xs rounded" disabled={isSaving}/>
-                                    <input value={editAppForm.phone} onChange={e=>setEditAppForm({...editAppForm, phone:e.target.value})} className="w-full border p-1.5 text-xs rounded" disabled={isSaving}/>
-                                    <div className={`mt-1.5 border border-dashed border-slate-300 p-1 rounded bg-white flex items-center ${isSaving ? 'opacity-50' : ''}`}>
-                                      <Upload size={12} className="text-slate-400 shrink-0 mx-1"/>
-                                      <input type="file" onChange={handleEditFileUpload} disabled={isSaving} className="text-[9px] w-full text-slate-600 file:mr-1 file:py-0.5 file:px-2 file:rounded file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"/>
-                                    </div>
-                                    {editAppForm.resumeName && <div className="text-[9px] text-blue-600 truncate mt-0.5" title={editAppForm.resumeName}>ไฟล์: {editAppForm.resumeName}</div>}
+                                <tr key={app.id} className="bg-blue-50/40">
+                                  <td className="p-4 font-bold text-slate-700 w-1/4">
+                                    <div className="text-[10px] text-blue-600 uppercase mb-1">สาขา</div>
+                                    {app.branchName}
                                   </td>
-                                  <td className="p-3 space-y-1 min-w-[200px]">
-                                    <select value={editAppForm.status} onChange={e=>setEditAppForm({...editAppForm, status:e.target.value})} className="w-full border p-1.5 text-xs rounded" disabled={isSaving}>
+                                  <td className="p-4 space-y-2 w-1/4">
+                                    <input value={editAppForm.name} onChange={e=>setEditAppForm({...editAppForm, name:e.target.value})} className="w-full border-slate-300 shadow-sm p-2.5 rounded-xl text-sm font-semibold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" disabled={isSaving} placeholder="ชื่อ-นามสกุล"/>
+                                    <input value={editAppForm.phone} onChange={e=>setEditAppForm({...editAppForm, phone:e.target.value})} className="w-full border-slate-300 shadow-sm p-2.5 rounded-xl text-sm font-semibold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" disabled={isSaving} placeholder="เบอร์โทรศัพท์"/>
+                                    <div className={`mt-2 border-2 border-dashed border-slate-300 p-2 rounded-xl bg-white flex items-center transition-all hover:border-blue-400 ${isSaving ? 'opacity-50' : ''}`}>
+                                      <Upload size={14} className="text-blue-500 shrink-0 mx-2"/>
+                                      <input type="file" onChange={handleEditFileUpload} disabled={isSaving} className="text-[10px] w-full text-slate-600 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer outline-none"/>
+                                    </div>
+                                    {editAppForm.resumeName && <div className="text-[10px] font-bold text-emerald-600 flex items-center truncate mt-1"><CheckCircle2 size={10} className="mr-1"/> ไฟล์: {editAppForm.resumeName}</div>}
+                                  </td>
+                                  <td className="p-4 space-y-2 min-w-[220px] w-1/4">
+                                    <select value={editAppForm.status} onChange={e=>setEditAppForm({...editAppForm, status:e.target.value})} className="w-full border-slate-300 shadow-sm p-2.5 rounded-xl text-sm font-bold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" disabled={isSaving}>
                                       {STATUSES.map(s=><option key={s}>{s}</option>)}
                                     </select>
-                                    {editAppForm.status==='รอเริ่มงาน' && <input type="date" value={editAppForm.startDate||''} onChange={e=>setEditAppForm({...editAppForm, startDate:e.target.value})} className="w-full border border-sky-400 p-1.5 text-xs rounded" title="วันที่เริ่มงาน" disabled={isSaving}/>}
-                                    {['อื่นๆ', 'ติดต่อผู้สมัครไม่ได้', 'ยกเลิกสัมภาษณ์/ไม่มาตามนัด', 'ไม่ผ่านสัมภาษณ์', 'ไม่มีตำแหน่งงานว่าง'].includes(editAppForm.status) && <input placeholder="ระบุเหตุผล" value={editAppForm.comment||''} onChange={e=>setEditAppForm({...editAppForm, comment:e.target.value})} className="w-full border border-orange-300 p-1.5 text-xs rounded" disabled={isSaving}/>}
+                                    {editAppForm.status==='รอเริ่มงาน' && <input type="date" value={editAppForm.startDate||''} onChange={e=>setEditAppForm({...editAppForm, startDate:e.target.value})} className="w-full border border-sky-300 bg-sky-50 text-sky-700 shadow-sm p-2.5 rounded-xl text-sm font-bold outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20" title="วันที่เริ่มงาน" disabled={isSaving}/>}
+                                    {['อื่นๆ', 'ติดต่อผู้สมัครไม่ได้', 'ยกเลิกสัมภาษณ์/ไม่มาตามนัด', 'ไม่ผ่านสัมภาษณ์', 'ไม่มีตำแหน่งงานว่าง'].includes(editAppForm.status) && <input placeholder="ระบุเหตุผลที่ปฏิเสธ..." value={editAppForm.comment||''} onChange={e=>setEditAppForm({...editAppForm, comment:e.target.value})} className="w-full border border-orange-300 bg-orange-50 text-orange-700 shadow-sm p-2.5 rounded-xl text-sm font-bold outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20" disabled={isSaving}/>}
                                   </td>
-                                  <td className="p-3 text-right">
-                                    <button onClick={saveEditApp} disabled={isSaving} className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 px-3 py-1.5 rounded text-xs mr-2 font-bold transition-colors disabled:opacity-50">
-                                      {isSaving ? <span className="flex items-center"><Loader2 size={12} className="animate-spin mr-1"/>บันทึก...</span> : 'บันทึก'}
-                                    </button>
-                                    <button onClick={()=>setEditAppId(null)} disabled={isSaving} className="bg-slate-200 hover:bg-slate-300 px-3 py-1.5 rounded text-xs transition-colors disabled:opacity-50">ยกเลิก</button>
+                                  <td className="p-4 text-right align-top w-1/4">
+                                    <div className="flex flex-col space-y-2 items-end">
+                                      <button onClick={saveEditApp} disabled={isSaving} className="w-full sm:w-auto bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md hover:shadow-lg transition-all disabled:opacity-50 flex justify-center items-center">
+                                        {isSaving ? <><Loader2 size={16} className="animate-spin mr-2"/>กำลังบันทึก...</> : 'บันทึกข้อมูล'}
+                                      </button>
+                                      <button onClick={()=>setEditAppId(null)} disabled={isSaving} className="w-full sm:w-auto bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-5 py-2.5 rounded-xl text-sm font-bold shadow-sm transition-all disabled:opacity-50">ยกเลิก</button>
+                                    </div>
                                   </td>
                                 </tr>
                               )
                               return (
-                                <tr key={app.id} className="border-t hover:bg-slate-50">
-                                  <td className="p-4">
-                                    <div className="font-semibold">{app.branchName}</div>
+                                <tr key={app.id} className="hover:bg-slate-50 transition-colors group">
+                                  <td className="p-5 w-1/4">
+                                    <div className="font-bold text-slate-800">{app.branchName}</div>
+                                    <div className="text-xs font-semibold text-slate-500 mt-1 flex items-center"><Briefcase size={12} className="mr-1.5 text-slate-400"/>{app.position}</div>
                                   </td>
-                                  <td className="p-4 cursor-pointer group" onClick={()=>startEditApp(app)}>
-                                    <div className="font-bold group-hover:text-blue-600">{app.name} <Edit size={12} className="inline opacity-0 group-hover:opacity-100 transition-opacity"/></div>
-                                    <div className="text-xs text-slate-500">{app.position} • {app.phone}</div>
-                                    <div className="flex items-center space-x-2 mt-1.5" onClick={(e) => e.stopPropagation()}>
+                                  <td className="p-5 cursor-pointer group/name w-1/4" onClick={()=>startEditApp(app)}>
+                                    <div className="font-extrabold text-base text-slate-800 group-hover/name:text-blue-600 flex items-center">{app.name} <Edit size={14} className="ml-2 opacity-0 group-hover/name:opacity-100 transition-opacity text-blue-500"/></div>
+                                    <div className="text-sm font-medium text-slate-500 mt-1 flex items-center"><Phone size={12} className="mr-1.5 text-slate-400"/>{app.phone}</div>
+                                    
+                                    <div className="flex flex-wrap items-center gap-2 mt-2.5" onClick={(e) => e.stopPropagation()}>
                                       {app.resumeBase64 && app.resumeBase64 !== 'Uploaded' && !String(app.resumeBase64).startsWith('Error') && (
-                                        <button onClick={(e) => handleViewResume(e, app.resumeBase64, app.resumeName)} className="text-[10px] text-blue-600 hover:text-blue-800 flex items-center bg-blue-50 px-2 py-0.5 rounded-md transition-colors border border-blue-100">
-                                          <Eye size={12} className="mr-1" /> ดูเรซูเม่
+                                        <button onClick={(e) => handleViewResume(e, app.resumeBase64, app.resumeName)} className="text-xs font-bold text-blue-700 hover:text-white bg-blue-50 hover:bg-blue-600 px-3 py-1.5 rounded-lg transition-all border border-blue-200 flex items-center shadow-sm">
+                                          <Eye size={14} className="mr-1.5" /> ดูเรซูเม่
                                         </button>
                                       )}
                                       {app.resumeBase64 === 'Uploaded' && (
-                                         <span className="text-[10px] text-slate-400 flex items-center bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200" title="ไฟล์ถูกบันทึกบน Cloud แล้ว">
-                                           <Paperclip size={12} className="mr-1" /> มีไฟล์แนบ
+                                         <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 flex items-center" title="ไฟล์ถูกบันทึกบน Cloud แล้ว">
+                                           <CheckCircle2 size={14} className="mr-1.5 text-emerald-500" /> แนบไฟล์แล้ว
                                          </span>
                                       )}
                                       {app.resumeBase64 && String(app.resumeBase64).startsWith('Error') && (
-                                         <span className="text-[10px] text-red-500 flex items-center bg-red-50 px-2 py-0.5 rounded-md border border-red-200" title={app.resumeBase64}>
-                                           <AlertCircle size={12} className="mr-1" /> อัปโหลดล้มเหลว
+                                         <span className="text-xs font-bold text-red-600 bg-red-50 px-3 py-1.5 rounded-lg border border-red-200 flex items-center" title={app.resumeBase64}>
+                                           <AlertCircle size={14} className="mr-1.5" /> อัปโหลดไฟล์ไม่สำเร็จ
                                          </span>
                                       )}
                                     </div>
                                   </td>
-                                  <td className="p-4">
-                                    <select value={app.status} onChange={e=>handleInlineStatusChange(app, e.target.value)} className="status-select font-bold text-xs px-3 py-1.5 rounded-full outline-none border transition-colors cursor-pointer max-w-[180px] truncate" style={{color:STATUS_COLORS[app.status]||'#64748b', borderColor:STATUS_COLORS[app.status]||'#cbd5e1'}}>
-                                      {STATUSES.map(s=><option key={s}>{s}</option>)}
+                                  <td className="p-5 w-1/4">
+                                    <select value={app.status} onChange={e=>handleInlineStatusChange(app, e.target.value)} className="status-select font-extrabold text-xs px-4 py-2 rounded-xl outline-none border transition-all cursor-pointer w-full shadow-sm hover:shadow-md" style={{color:STATUS_COLORS[app.status]||'#64748b', borderColor:STATUS_COLORS[app.status]||'#cbd5e1', backgroundColor: (STATUS_COLORS[app.status]||'#cbd5e1')+'10'}}>
+                                      {STATUSES.map(s=><option key={s} value={s}>{s}</option>)}
                                     </select>
-                                    {app.status==='รอเริ่มงาน' && app.startDate && <div className="text-[10px] text-sky-600 mt-1.5 font-bold">วันที่เริ่มงาน: {new Date(app.startDate).toLocaleDateString('th')}</div>}
-                                    {app.comment && <div className="text-[10px] text-slate-500 mt-1.5 max-w-[200px] truncate" title={app.comment}>เหตุผล: {app.comment}</div>}
+                                    {app.status==='รอเริ่มงาน' && app.startDate && <div className="text-xs text-sky-700 mt-2 font-bold flex items-center bg-sky-50 p-1.5 rounded-lg border border-sky-100"><Clock size={12} className="mr-1.5"/>เริ่มงาน: {new Date(app.startDate).toLocaleDateString('th')}</div>}
+                                    {app.comment && <div className="text-[11px] text-slate-500 mt-2 font-medium bg-slate-100 p-2 rounded-lg border border-slate-200 border-l-2 border-l-orange-400" title={app.comment}>"{app.comment}"</div>}
                                   </td>
-                                  <td className="p-4 text-right space-x-2">
-                                    <button onClick={()=>startEditApp(app)} className="text-slate-400 hover:text-blue-600 transition-colors"><Edit size={16}/></button>
-                                    <button onClick={()=>deleteApplicant(app.id)} className="text-slate-400 hover:text-red-600 transition-colors"><Trash2 size={16}/></button>
+                                  <td className="p-5 text-right space-x-1 w-1/4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onClick={()=>startEditApp(app)} className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"><Edit size={18}/></button>
+                                    <button onClick={()=>deleteApplicant(app.id)} className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={18}/></button>
                                   </td>
                                 </tr>
                               )
@@ -1346,35 +1226,61 @@
 
                 {/* Add Applicant Modal */}
                 {addingApplicantFor && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
-                      <div className="px-6 py-4 border-b bg-blue-600 text-white flex justify-between items-center">
-                        <h3 className="font-bold">เพิ่มผู้สมัคร: {addingApplicantFor.position}</h3>
-                        <button onClick={()=>setAddingApplicantFor(null)} disabled={isSaving} className="hover:bg-white/20 p-1 rounded-full transition-colors disabled:opacity-50"><X size={20}/></button>
+                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-300 border border-slate-100">
+                      <div className="px-8 py-5 border-b bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex justify-between items-center shadow-md relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10"></div>
+                        <div className="relative z-10">
+                          <h3 className="font-extrabold text-xl">เพิ่มประวัติผู้สมัครใหม่</h3>
+                          <p className="text-blue-100 text-sm mt-0.5 font-medium">{addingApplicantFor.position} • {addingApplicantFor.branchName}</p>
+                        </div>
+                        <button onClick={()=>setAddingApplicantFor(null)} disabled={isSaving} className="relative z-10 hover:bg-white/20 p-2 rounded-full transition-colors disabled:opacity-50"><X size={24}/></button>
                       </div>
-                      <form onSubmit={handleRecruitSubmit} className="p-6 space-y-4">
-                        <input required placeholder="ชื่อ-นามสกุล" value={formData.name} onChange={handleInputChange} name="name" disabled={isSaving} className="w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-colors"/>
-                        <input required type="tel" placeholder="เบอร์โทร" value={formData.phone} onChange={handleInputChange} name="phone" disabled={isSaving} className="w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-colors"/>
-                        <select required name="status" value={formData.status} onChange={handleInputChange} disabled={isSaving} className="w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-colors">
-                          <option value="">-- สถานะปัจจุบัน --</option>
-                          {STATUSES.map(s=><option key={s}>{s}</option>)}
-                        </select>
+                      <form onSubmit={handleRecruitSubmit} className="p-8 space-y-5 bg-slate-50/30">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-slate-500 ml-1">ข้อมูลเบื้องต้น</label>
+                          <input required placeholder="ชื่อ-นามสกุล" value={formData.name} onChange={handleInputChange} name="name" disabled={isSaving} className="w-full bg-white border border-slate-200 rounded-2xl p-4 text-sm font-semibold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all shadow-sm"/>
+                          <input required type="tel" placeholder="เบอร์โทรศัพท์ (ติดต่อได้จริง)" value={formData.phone} onChange={handleInputChange} name="phone" disabled={isSaving} className="w-full bg-white border border-slate-200 rounded-2xl p-4 text-sm font-semibold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all shadow-sm mt-3"/>
+                        </div>
+                        
+                        <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                          <label className="text-xs font-bold text-slate-500 ml-1">สถานะผู้สมัคร</label>
+                          <select required name="status" value={formData.status} onChange={handleInputChange} disabled={isSaving} className="w-full bg-white border border-slate-200 rounded-2xl p-4 text-sm font-bold text-slate-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all shadow-sm">
+                            <option value="">-- อัปเดตสถานะปัจจุบัน --</option>
+                            {STATUSES.map(s=><option key={s}>{s}</option>)}
+                          </select>
+                        </div>
+
                         {formData.status === 'รอเริ่มงาน' && (
-                          <div className="space-y-1">
-                            <label className="text-xs font-bold text-sky-600 ml-1">ระบุวันที่เริ่มงาน *</label>
-                            <input required type="date" name="startDate" value={formData.startDate||''} onChange={handleInputChange} disabled={isSaving} className="w-full border border-sky-300 bg-sky-50 rounded-xl p-3 outline-none focus:border-sky-500" title="วันที่เริ่มงาน"/>
+                          <div className="space-y-1.5 animate-in slide-in-from-top-2">
+                            <label className="text-xs font-bold text-sky-600 ml-1 flex items-center"><Clock size={12} className="mr-1"/> ระบุวันที่เริ่มงาน *</label>
+                            <input required type="date" name="startDate" value={formData.startDate||''} onChange={handleInputChange} disabled={isSaving} className="w-full border-2 border-sky-300 bg-sky-50 text-sky-800 rounded-2xl p-4 text-sm font-bold outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-500/20 transition-all shadow-sm" title="วันที่เริ่มงาน"/>
                           </div>
                         )}
+
                         {['อื่นๆ', 'ติดต่อผู้สมัครไม่ได้', 'ยกเลิกสัมภาษณ์/ไม่มาตามนัด', 'ไม่ผ่านสัมภาษณ์', 'ไม่มีตำแหน่งงานว่าง'].includes(formData.status) && (
-                          <textarea required name="comment" value={formData.comment} onChange={handleInputChange} disabled={isSaving} placeholder="ระบุเหตุผลที่ปฏิเสธ / ยกเลิก *" className="w-full border border-orange-300 bg-orange-50 rounded-xl p-3 outline-none focus:border-orange-500"></textarea>
+                          <div className="animate-in slide-in-from-top-2">
+                            <textarea required name="comment" value={formData.comment} onChange={handleInputChange} disabled={isSaving} placeholder="โปรดระบุเหตุผลโดยย่อ *" className="w-full border-2 border-orange-200 bg-orange-50 text-orange-800 rounded-2xl p-4 text-sm font-medium outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 transition-all shadow-sm h-24"></textarea>
+                          </div>
                         )}
-                        <div className={`flex items-center space-x-2 border p-3 rounded-xl bg-slate-50 ${isSaving ? 'opacity-50' : ''}`}>
-                          <Upload size={16} className="text-slate-500"/>
-                          <input type="file" onChange={handleFileUpload} disabled={isSaving} className="text-sm w-full text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"/>
+
+                        <div className={`space-y-1.5 pt-2 border-t border-slate-100 ${isSaving ? 'opacity-50' : ''}`}>
+                           <label className="text-xs font-bold text-slate-500 ml-1">แนบไฟล์ Resume (PDF / รูปภาพ ไม่เกิน 3MB)</label>
+                           <div className="flex items-center space-x-3 border-2 border-dashed border-slate-300 p-2 rounded-2xl bg-white hover:border-blue-400 hover:bg-blue-50/50 transition-all group cursor-pointer relative overflow-hidden">
+                            <div className="bg-slate-100 group-hover:bg-blue-100 p-3 rounded-xl text-slate-500 group-hover:text-blue-600 transition-colors ml-1"><Upload size={20}/></div>
+                            <input type="file" onChange={handleFileUpload} disabled={isSaving} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" title="คลิกเพื่อแนบไฟล์"/>
+                            <div className="flex-1 truncate">
+                              <p className="text-sm font-bold text-slate-700 truncate">{formData.resumeName || 'คลิกเพื่อเลือกไฟล์แนบ'}</p>
+                              <p className="text-[10px] text-slate-400">รองรับ .pdf, .jpg, .png</p>
+                            </div>
+                            {formData.resumeName && <CheckCircle2 size={20} className="text-emerald-500 mr-4"/>}
+                          </div>
                         </div>
-                        <div className="pt-4 flex justify-end">
-                          <button type="submit" disabled={isSaving} className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2.5 rounded-xl shadow-md transition-colors flex items-center disabled:opacity-70">
-                            {isSaving ? <><Loader2 size={18} className="animate-spin mr-2"/>กำลังบันทึกไฟล์...</> : 'บันทึกข้อมูล'}
+
+                        <div className="pt-6 flex justify-end gap-3">
+                          <button type="button" onClick={()=>setAddingApplicantFor(null)} disabled={isSaving} className="px-6 py-3 rounded-2xl font-bold text-slate-600 hover:bg-slate-200 transition-colors disabled:opacity-50">ยกเลิก</button>
+                          <button type="submit" disabled={isSaving} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold px-8 py-3 rounded-2xl shadow-lg shadow-blue-500/30 hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center disabled:opacity-70 disabled:cursor-not-allowed">
+                            {isSaving ? <><Loader2 size={18} className="animate-spin mr-2"/>กำลังบันทึกและอัปโหลด...</> : <><Check size={18} className="mr-2"/>บันทึกข้อมูล</>}
                           </button>
                         </div>
                       </form>
@@ -1386,180 +1292,189 @@
 
             {/* Tab: Dashboard */}
             {activeTab === 'dashboard' && (
-              <div className="space-y-6">
-                <div className="bg-slate-900 p-8 rounded-3xl text-white flex flex-col md:flex-row justify-between items-start md:items-center shadow-lg">
-                  <div className="mb-4 md:mb-0">
-                    <h2 className="text-2xl font-black">Executive Dashboard</h2>
-                    <p className="text-slate-400 text-sm mt-1">ภาพรวมการสรรหาบุคลากรทั้งหมด</p>
-                  </div>
-                  <select value={dashboardTA} onChange={e=>setDashboardTA(e.target.value)} className="bg-white/10 border border-white/20 p-2.5 rounded-xl text-white outline-none focus:bg-slate-800 transition-colors">
-                    <option value="ALL">All TAs (ภาพรวมทั้งหมด)</option>
-                    {appTAs.map(t=><option key={t}>{t}</option>)}
-                  </select>
-                </div>
-
-                {/* Vacancy Overview */}
-                <div>
-                  <h3 className="text-lg font-bold mb-4 text-slate-700 flex items-center"><Briefcase className="mr-2" size={20}/> ภาพรวมตำแหน่งงาน (Vacancy Overview)</h3>
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                     <div className="bg-white p-5 rounded-2xl border shadow-sm hover:shadow-lg transform transition-all hover:-translate-y-1 cursor-pointer hover:border-blue-400" onClick={() => handleShowDashboardDetail('เปิดรับทั้งหมด (Active)', 'vacancy', 'all')}>
-                       <div className="text-sm text-slate-500 font-bold mb-2">เปิดรับทั้งหมด (Active)</div>
-                       <div className="text-3xl font-black text-slate-800">{vacancyStats.total}</div>
-                     </div>
-                     <div className="bg-white p-5 rounded-2xl border border-amber-100 shadow-sm hover:shadow-lg transform transition-all hover:-translate-y-1 cursor-pointer hover:border-amber-400" onClick={() => handleShowDashboardDetail('ว่าง (Vacant)', 'vacancy', 'vacant')}>
-                       <div className="text-sm text-amber-600 font-bold mb-2">ว่าง (Vacant)</div>
-                       <div className="text-3xl font-black text-amber-600">{vacancyStats.vacant}</div>
-                     </div>
-                     <div className="bg-white p-5 rounded-2xl border border-purple-100 shadow-sm hover:shadow-lg transform transition-all hover:-translate-y-1 cursor-pointer hover:border-purple-400" onClick={() => handleShowDashboardDetail('Promote & Transfer', 'vacancy', 'promote')}>
-                       <div className="text-sm text-purple-600 font-bold mb-2">Promote & Transfer</div>
-                       <div className="text-3xl font-black text-purple-600">{vacancyStats.promoteTransfer}</div>
-                     </div>
-                     <div className="bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm hover:shadow-lg transform transition-all hover:-translate-y-1 cursor-pointer hover:border-emerald-400 bg-gradient-to-br from-emerald-50 to-white flex flex-col justify-center" onClick={() => handleShowDashboardDetail('Progress (ได้คนแล้ว)', 'vacancy', 'fulfilled')}>
-                       <div className="flex justify-between items-end mb-2">
-                         <div className="text-sm text-emerald-700 font-bold">Progress (ได้คนแล้ว)</div>
-                         <div className="text-sm text-emerald-600 font-bold">{vacancyStats.fulfilled}/{vacancyStats.total}</div>
-                       </div>
-                       <div className="flex items-end space-x-2">
-                         <div className="text-3xl font-black text-emerald-600">{vacancyStats.progress}%</div>
-                       </div>
-                       <div className="w-full bg-emerald-200 rounded-full h-1.5 mt-2 overflow-hidden">
-                         <div className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${vacancyStats.progress}%` }}></div>
-                       </div>
-                     </div>
-                  </div>
-                </div>
-
-                {/* Applicant Overview */}
-                <div>
-                  <h3 className="text-lg font-bold mb-4 mt-6 text-slate-700 flex items-center"><Users className="mr-2" size={20}/> ภาพรวมผู้สมัคร (Applicant Overview)</h3>
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                     <div className="bg-white p-5 rounded-2xl border shadow-sm hover:shadow-lg transform transition-all hover:-translate-y-1 cursor-pointer hover:border-blue-400" onClick={() => handleShowDashboardDetail('รวมผู้สมัคร', 'applicant', 'all')}>
-                       <div className="text-sm text-slate-500 font-bold mb-2 flex items-center space-x-1"><span>รวมผู้สมัคร</span></div>
-                       <div className="text-3xl font-black text-slate-800">{dashboardData.length}</div>
-                     </div>
-                     <div className="bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm hover:shadow-lg transform transition-all hover:-translate-y-1 cursor-pointer hover:border-emerald-400" onClick={() => handleShowDashboardDetail('สำเร็จ (Hired)', 'applicant', 'hired')}>
-                       <div className="text-sm text-emerald-600 font-bold mb-2 flex items-center space-x-1"><CheckCircle2 size={16}/><span>สำเร็จ (Hired)</span></div>
-                       <div className="text-3xl font-black text-emerald-600">
-                         {dashboardData.filter(a => {
-                           if (a.status === 'ผ่านสัมภาษณ์') return true;
-                           if (a.status === 'รอเริ่มงาน' && a.startDate) {
-                             const sDate = new Date(a.startDate).setHours(0,0,0,0);
-                             const today = new Date().setHours(0,0,0,0);
-                             return today >= sDate;
-                           }
-                           return false;
-                         }).length}
-                       </div>
-                     </div>
-                     <div className="bg-white p-5 rounded-2xl border border-amber-100 shadow-sm hover:shadow-lg transform transition-all hover:-translate-y-1 cursor-pointer hover:border-amber-400" onClick={() => handleShowDashboardDetail('รอดำเนินการ', 'applicant', 'pending')}>
-                       <div className="text-sm text-amber-600 font-bold mb-2 flex items-center space-x-1"><Clock size={16}/><span>รอดำเนินการ</span></div>
-                       <div className="text-3xl font-black text-amber-600">
-                         {dashboardData.filter(a => {
-                           if (['รอพิจารณาประวัติ', 'รอผลสัมภาษณ์', 'อยู่ระหว่างนัดสัมภาษณ์', 'สำรอง/เก็บไว้พิจารณา', 'ตรวจสุขภาพ'].includes(a.status)) return true;
-                           if (a.status === 'รอเริ่มงาน') {
-                             if (!a.startDate) return true;
-                             const sDate = new Date(a.startDate).setHours(0,0,0,0);
-                             const today = new Date().setHours(0,0,0,0);
-                             return today < sDate;
-                           }
-                           return false;
-                         }).length}
-                       </div>
-                     </div>
-                     <div className="bg-white p-5 rounded-2xl border border-red-100 shadow-sm hover:shadow-lg transform transition-all hover:-translate-y-1 cursor-pointer hover:border-red-400" onClick={() => handleShowDashboardDetail('ไม่ผ่าน/ปฏิเสธ', 'applicant', 'rejected')}>
-                       <div className="text-sm text-red-600 font-bold mb-2 flex items-center space-x-1"><AlertCircle size={16}/><span>ไม่ผ่าน/ปฏิเสธ</span></div>
-                       <div className="text-3xl font-black text-red-600">{dashboardData.filter(a=>['ติดต่อผู้สมัครไม่ได้', 'ยกเลิกสัมภาษณ์/ไม่มาตามนัด', 'ไม่ผ่านสัมภาษณ์', 'ไม่มีตำแหน่งงานว่าง'].includes(a.status)).length}</div>
-                     </div>
-                  </div>
-                </div>
-
-                {/* Progress รายสาขา (Table replacing charts) */}
-                <div className="bg-white rounded-3xl shadow-sm border mt-6 overflow-hidden">
-                  <div className="p-6 border-b flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-50/50">
-                    <h3 className="font-bold text-lg flex items-center text-slate-700">
-                      <Building2 className="mr-2 text-blue-600" size={20}/> 
-                      Progress รายสาขา
-                    </h3>
-                    <div className="flex flex-col sm:flex-row items-center w-full md:w-auto gap-3">
-                      <select 
-                        value={dashboardAreaFilter} 
-                        onChange={(e) => { setDashboardAreaFilter(e.target.value); setDashboardBranchFilter(''); }}
-                        className="w-full sm:w-auto border rounded-xl px-4 py-2.5 text-sm outline-none focus:border-blue-500 bg-white font-medium text-slate-600"
-                      >
-                        <option value="">ทุก Area</option>
-                        {appAreas.map(a => <option key={a} value={a}>{a}</option>)}
-                      </select>
-                      <select 
-                        value={dashboardBranchFilter} 
-                        onChange={(e) => setDashboardBranchFilter(e.target.value)}
-                        disabled={!dashboardAreaFilter}
-                        className="w-full sm:w-auto border rounded-xl px-4 py-2.5 text-sm outline-none focus:border-blue-500 bg-white font-medium text-slate-600 disabled:bg-slate-100 disabled:text-slate-400"
-                      >
-                        <option value="">ทุกสาขา</option>
-                        {dashboardBranchesForFilter.map(b => <option key={b.code} value={b.code}>{b.name}</option>)}
-                      </select>
+              <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
+                <div className="bg-slate-900 p-8 rounded-3xl text-white flex flex-col md:flex-row justify-between items-start md:items-center shadow-xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
+                  <div className="absolute bottom-0 left-20 w-40 h-40 bg-purple-500/20 rounded-full blur-3xl -mb-10 pointer-events-none"></div>
+                  
+                  <div className="mb-6 md:mb-0 relative z-10 w-full flex justify-between items-start md:block">
+                    <div>
+                      <h2 className="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-white to-blue-200">Executive Dashboard</h2>
+                      <p className="text-slate-400 text-sm mt-1.5 font-medium flex items-center"><BarChart3 size={14} className="mr-1.5"/> สรุปภาพรวมและติดตามสถานะการสรรหา</p>
                     </div>
                   </div>
-                  <div className="overflow-x-auto hide-scrollbar">
-                    <table className="w-full text-sm text-left whitespace-nowrap">
-                      <thead className="bg-white border-b text-slate-500">
-                        <tr>
-                          <th className="p-5 font-bold">Area</th>
-                          <th className="p-5 font-bold">สาขา</th>
-                          <th className="p-5 font-bold text-center">ตำแหน่งเปิดรับ</th>
-                          <th className="p-5 font-bold text-center">ผู้สมัครเข้าร่วม</th>
-                          <th className="p-5 font-bold min-w-[250px] xl:min-w-[350px]">ความคืบหน้า (Progress)</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {branchProgressData.length > 0 ? branchProgressData.map((row, idx) => {
-                          const progressPct = row.totalVacancies > 0 ? Math.round((row.fulfilledVacancies / row.totalVacancies) * 100) : 0;
-                          return (
-                            <tr key={idx} className="border-b hover:bg-slate-50 transition-colors">
-                              <td className="p-5 font-bold text-blue-600">{row.area}</td>
-                              <td className="p-5 font-semibold text-slate-700">{row.branchName}</td>
-                              <td className="p-5 text-center">
-                                <span className="bg-slate-100 text-slate-700 px-3 py-1.5 rounded-lg font-bold">{row.totalVacancies}</span>
-                              </td>
-                              <td className="p-5 text-center">
-                                <span className="bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg font-bold cursor-pointer hover:bg-blue-100 transition-colors shadow-sm" onClick={() => handleShowDashboardDetail(`รายชื่อผู้สมัครสาขา: ${row.branchName}`, 'applicant', 'all', row.branchCode)} title="คลิกเพื่อดูรายชื่อผู้สมัคร">
-                                  {row.applicantCount}
-                                </span>
-                              </td>
-                              <td className="p-5 cursor-pointer group" onClick={() => handleShowDashboardDetail(`ตำแหน่งที่สำเร็จแล้ว (สาขา: ${row.branchName})`, 'vacancy', 'fulfilled', row.branchCode)} title="คลิกเพื่อดูรายละเอียดตำแหน่งที่ได้คนแล้ว">
-                                <div className="flex items-center justify-between mb-2">
-                                  <span className="text-xs font-bold text-slate-500 flex items-center">
-                                    <span className="text-slate-800">{row.fulfilledVacancies} / {row.totalVacancies}</span>
-                                    <span className="mx-2 text-slate-300">|</span>
-                                    <span className="text-[10px] text-amber-500 mr-2">ว่าง: {row.totalVacancies - row.fulfilledVacancies}</span>
-                                    <span className="text-[10px] text-emerald-500">สำเร็จแล้ว: {row.fulfilledVacancies}</span>
+                  
+                  <div className="flex flex-col sm:flex-row items-end sm:items-center w-full md:w-auto gap-4 relative z-10 hide-on-pdf">
+                    <select value={dashboardTA} onChange={e=>setDashboardTA(e.target.value)} className="w-full sm:w-auto bg-white/10 backdrop-blur-md border border-white/20 px-5 py-3 rounded-2xl text-white font-bold outline-none focus:bg-slate-800 hover:bg-white/20 transition-all cursor-pointer shadow-lg shadow-black/20">
+                      <option value="ALL" className="text-slate-800">📊 All TAs (ภาพรวมทั้งหมด)</option>
+                      {appTAs.map(t=><option key={t} className="text-slate-800">{t}</option>)}
+                    </select>
+
+                    <div className="flex w-full sm:w-auto gap-2">
+                      <button onClick={sendLineSummary} disabled={isSendingLine} className="flex-1 sm:flex-none flex items-center justify-center space-x-2 bg-[#00B900] hover:bg-[#009900] text-white font-bold px-5 py-3 rounded-2xl shadow-lg shadow-[#00B900]/30 transition-all hover:-translate-y-0.5 disabled:opacity-70">
+                        {isSendingLine ? <Loader2 size={18} className="animate-spin"/> : <Send size={18}/>}
+                        <span className="hidden sm:inline">แจ้งเตือน LINE</span>
+                      </button>
+                      <button onClick={exportDashboardToPDF} className="flex-1 sm:flex-none flex items-center justify-center space-x-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold px-5 py-3 rounded-2xl shadow-lg shadow-purple-500/30 transition-all hover:-translate-y-0.5">
+                        <Printer size={18}/>
+                        <span className="hidden sm:inline">Export PDF</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Dashboard Content Container (สำหรับทำ PDF) */}
+                <div id="dashboard-export-area" className="space-y-8 bg-transparent p-1">
+                  {/* Vacancy Overview */}
+                  <div>
+                    <h3 className="text-lg font-extrabold mb-4 text-slate-800 flex items-center pl-1"><Briefcase className="mr-2 text-blue-600" size={22}/> สรุปสถานะตำแหน่งงาน <span className="text-sm font-medium text-slate-400 ml-2">(Vacancy Overview)</span></h3>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                       <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg transform transition-all duration-300 hover:-translate-y-1 cursor-pointer hover:border-blue-400 group relative overflow-hidden" onClick={() => handleShowDashboardDetail('เปิดรับทั้งหมด (Active)', 'vacancy', 'all')}>
+                         <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-full blur-2xl -mr-10 -mt-10 transition-all group-hover:bg-blue-100"></div>
+                         <div className="text-sm text-slate-500 font-bold mb-3 relative z-10 flex items-center"><Target size={16} className="mr-1.5 text-blue-400"/>เปิดรับทั้งหมด</div>
+                         <div className="text-4xl font-black text-slate-800 relative z-10">{vacancyStats.total}</div>
+                       </div>
+                       <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg transform transition-all duration-300 hover:-translate-y-1 cursor-pointer hover:border-amber-400 group relative overflow-hidden" onClick={() => handleShowDashboardDetail('ว่าง (Vacant)', 'vacancy', 'vacant')}>
+                         <div className="absolute top-0 right-0 w-24 h-24 bg-amber-50 rounded-full blur-2xl -mr-10 -mt-10 transition-all group-hover:bg-amber-100"></div>
+                         <div className="text-sm text-amber-600 font-bold mb-3 relative z-10 flex items-center"><AlertCircle size={16} className="mr-1.5"/>ว่าง (Vacant)</div>
+                         <div className="text-4xl font-black text-amber-600 relative z-10">{vacancyStats.vacant}</div>
+                       </div>
+                       <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg transform transition-all duration-300 hover:-translate-y-1 cursor-pointer hover:border-purple-400 group relative overflow-hidden" onClick={() => handleShowDashboardDetail('Promote & Transfer', 'vacancy', 'promote')}>
+                         <div className="absolute top-0 right-0 w-24 h-24 bg-purple-50 rounded-full blur-2xl -mr-10 -mt-10 transition-all group-hover:bg-purple-100"></div>
+                         <div className="text-sm text-purple-600 font-bold mb-3 relative z-10 flex items-center"><Users size={16} className="mr-1.5"/>Promote/Transfer</div>
+                         <div className="text-4xl font-black text-purple-600 relative z-10">{vacancyStats.promoteTransfer}</div>
+                       </div>
+                       <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-6 rounded-3xl shadow-lg shadow-emerald-500/20 hover:shadow-xl transform transition-all duration-300 hover:-translate-y-1 cursor-pointer text-white relative overflow-hidden flex flex-col justify-center" onClick={() => handleShowDashboardDetail('Progress (ได้คนแล้ว)', 'vacancy', 'fulfilled')}>
+                         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10"></div>
+                         <div className="flex justify-between items-end mb-2 relative z-10">
+                           <div className="text-sm text-emerald-50 font-bold flex items-center"><CheckCircle2 size={16} className="mr-1.5"/>Progress (ปิดงาน)</div>
+                           <div className="text-sm text-emerald-100 font-bold bg-black/10 px-2 py-0.5 rounded-lg">{vacancyStats.fulfilled}/{vacancyStats.total}</div>
+                         </div>
+                         <div className="flex items-end space-x-2 relative z-10 mt-1">
+                           <div className="text-4xl font-black text-white">{vacancyStats.progress}%</div>
+                         </div>
+                         <div className="w-full bg-black/20 rounded-full h-2 mt-4 overflow-hidden relative z-10">
+                           <div className="bg-white h-2 rounded-full transition-all duration-1000 ease-out" style={{ width: `${vacancyStats.progress}%` }}></div>
+                         </div>
+                       </div>
+                    </div>
+                  </div>
+
+                  {/* Applicant Overview */}
+                  <div>
+                    <h3 className="text-lg font-extrabold mb-4 text-slate-800 flex items-center pl-1"><UserPlus className="mr-2 text-indigo-600" size={22}/> สรุปสถานะผู้สมัคร <span className="text-sm font-medium text-slate-400 ml-2">(Applicant Overview)</span></h3>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                       <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg transform transition-all duration-300 hover:-translate-y-1 cursor-pointer hover:border-indigo-400 group relative overflow-hidden" onClick={() => handleShowDashboardDetail('รวมผู้สมัคร', 'applicant', 'all')}>
+                         <div className="text-sm text-slate-500 font-bold mb-2 flex items-center space-x-1.5"><Users size={16} className="text-indigo-400"/><span>ผู้สมัครทั้งหมด</span></div>
+                         <div className="text-3xl font-black text-slate-800">{dashboardData.length}</div>
+                       </div>
+                       <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg transform transition-all duration-300 hover:-translate-y-1 cursor-pointer hover:border-emerald-400 group relative overflow-hidden" onClick={() => handleShowDashboardDetail('สำเร็จ (Hired)', 'applicant', 'hired')}>
+                         <div className="text-sm text-emerald-600 font-bold mb-2 flex items-center space-x-1.5"><CheckCircle2 size={16}/><span>สำเร็จ (Hired)</span></div>
+                         <div className="text-3xl font-black text-emerald-600">
+                           {dashboardData.filter(a => {
+                             if (a.status === 'ผ่านสัมภาษณ์') return true;
+                             if (a.status === 'รอเริ่มงาน' && a.startDate) return new Date().setHours(0,0,0,0) >= new Date(a.startDate).setHours(0,0,0,0);
+                             return false;
+                           }).length}
+                         </div>
+                       </div>
+                       <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg transform transition-all duration-300 hover:-translate-y-1 cursor-pointer hover:border-amber-400 group relative overflow-hidden" onClick={() => handleShowDashboardDetail('รอดำเนินการ', 'applicant', 'pending')}>
+                         <div className="text-sm text-amber-600 font-bold mb-2 flex items-center space-x-1.5"><Clock size={16}/><span>รอดำเนินการ</span></div>
+                         <div className="text-3xl font-black text-amber-600">
+                           {dashboardData.filter(a => {
+                             if (['รอพิจารณาประวัติ', 'รอผลสัมภาษณ์', 'อยู่ระหว่างนัดสัมภาษณ์', 'สำรอง/เก็บไว้พิจารณา', 'ตรวจสุขภาพ'].includes(a.status)) return true;
+                             if (a.status === 'รอเริ่มงาน') return !a.startDate || new Date().setHours(0,0,0,0) < new Date(a.startDate).setHours(0,0,0,0);
+                             return false;
+                           }).length}
+                         </div>
+                       </div>
+                       <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:shadow-lg transform transition-all duration-300 hover:-translate-y-1 cursor-pointer hover:border-red-400 group relative overflow-hidden" onClick={() => handleShowDashboardDetail('ไม่ผ่าน/ปฏิเสธ', 'applicant', 'rejected')}>
+                         <div className="text-sm text-red-500 font-bold mb-2 flex items-center space-x-1.5"><X size={16}/><span>ไม่ผ่าน/ปฏิเสธ</span></div>
+                         <div className="text-3xl font-black text-red-500">{dashboardData.filter(a=>['ติดต่อผู้สมัครไม่ได้', 'ยกเลิกสัมภาษณ์/ไม่มาตามนัด', 'ไม่ผ่านสัมภาษณ์', 'ไม่มีตำแหน่งงานว่าง'].includes(a.status)).length}</div>
+                       </div>
+                    </div>
+                  </div>
+
+                  {/* Progress รายสาขา (Table replacing charts) */}
+                  <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-50/50">
+                      <h3 className="font-extrabold text-lg flex items-center text-slate-800">
+                        <Building2 className="mr-2 text-indigo-600" size={20}/> 
+                        ความคืบหน้า (Progress) รายสาขา
+                      </h3>
+                      <div className="flex flex-col sm:flex-row items-center w-full md:w-auto gap-3 hide-on-pdf">
+                        <select value={dashboardAreaFilter} onChange={(e) => { setDashboardAreaFilter(e.target.value); setDashboardBranchFilter(''); }} className="w-full sm:w-auto border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:border-indigo-500 bg-white text-slate-700 shadow-sm">
+                          <option value="">ทุก Area</option>
+                          {appAreas.map(a => <option key={a} value={a}>{a}</option>)}
+                        </select>
+                        <select value={dashboardBranchFilter} onChange={(e) => setDashboardBranchFilter(e.target.value)} disabled={!dashboardAreaFilter} className="w-full sm:w-auto border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:border-indigo-500 bg-white text-slate-700 shadow-sm disabled:opacity-50">
+                          <option value="">ทุกสาขา</option>
+                          {dashboardBranchesForFilter.map(b => <option key={b.code} value={b.code}>{b.name}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="overflow-x-auto hide-scrollbar">
+                      <table className="w-full text-sm text-left whitespace-nowrap">
+                        <thead className="bg-white border-b text-slate-400">
+                          <tr>
+                            <th className="p-5 font-bold uppercase tracking-wider text-xs">Area</th>
+                            <th className="p-5 font-bold uppercase tracking-wider text-xs">สาขา</th>
+                            <th className="p-5 font-bold text-center uppercase tracking-wider text-xs">ตำแหน่งที่เปิด</th>
+                            <th className="p-5 font-bold text-center uppercase tracking-wider text-xs">ผู้สมัคร (คน)</th>
+                            <th className="p-5 font-bold min-w-[250px] xl:min-w-[350px] uppercase tracking-wider text-xs">Progress %</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          {branchProgressData.length > 0 ? branchProgressData.map((row, idx) => {
+                            const progressPct = row.totalVacancies > 0 ? Math.round((row.fulfilledVacancies / row.totalVacancies) * 100) : 0;
+                            return (
+                              <tr key={idx} className="hover:bg-slate-50/80 transition-colors group">
+                                <td className="p-5 font-black text-indigo-600">{row.area}</td>
+                                <td className="p-5 font-bold text-slate-800">{row.branchName}</td>
+                                <td className="p-5 text-center">
+                                  <span className="bg-slate-100 border border-slate-200 text-slate-700 w-10 h-10 inline-flex items-center justify-center rounded-xl font-black">{row.totalVacancies}</span>
+                                </td>
+                                <td className="p-5 text-center">
+                                  <span className="bg-indigo-50 border border-indigo-100 text-indigo-700 px-4 py-2 rounded-xl font-black cursor-pointer hover:bg-indigo-600 hover:text-white transition-all shadow-sm group-hover:shadow-md" onClick={() => handleShowDashboardDetail(`รายชื่อผู้สมัครสาขา: ${row.branchName}`, 'applicant', 'all', row.branchCode)} title="คลิกเพื่อดูรายชื่อผู้สมัคร">
+                                    {row.applicantCount}
                                   </span>
-                                  <div className="flex items-center space-x-2">
-                                    <span className="text-[10px] text-blue-500 font-medium opacity-0 group-hover:opacity-100 transition-opacity hidden sm:inline">คลิกดูรายละเอียด</span>
-                                    <span className="text-xs font-black text-emerald-600">{progressPct}%</span>
+                                </td>
+                                <td className="p-5 cursor-pointer group/progress" onClick={() => handleShowDashboardDetail(`ตำแหน่งที่สำเร็จแล้ว (สาขา: ${row.branchName})`, 'vacancy', 'fulfilled', row.branchCode)} title="คลิกเพื่อดูรายละเอียดตำแหน่งที่ได้คนแล้ว">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs font-bold flex items-center">
+                                      <span className="bg-slate-800 text-white px-2 py-0.5 rounded-md">{row.fulfilledVacancies} / {row.totalVacancies}</span>
+                                      <span className="mx-2 text-slate-300">|</span>
+                                      <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded mr-1.5">สำเร็จ {row.fulfilledVacancies}</span>
+                                      <span className="text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">ว่าง {row.totalVacancies - row.fulfilledVacancies}</span>
+                                    </span>
+                                    <div className="flex items-center space-x-2">
+                                      <span className="text-[10px] text-indigo-500 font-bold opacity-0 group-hover/progress:opacity-100 transition-opacity hidden sm:inline">คลิกดูข้อมูล</span>
+                                      <span className="text-sm font-black text-emerald-600">{progressPct}%</span>
+                                    </div>
                                   </div>
-                                </div>
-                                <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                                  <div 
-                                    className={`h-2.5 rounded-full transition-all duration-700 ease-out ${progressPct === 100 ? 'bg-emerald-500' : progressPct > 0 ? 'bg-blue-500' : 'bg-slate-300'}`} 
-                                    style={{ width: `${progressPct}%` }}
-                                  ></div>
+                                  <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden border border-slate-200/50 shadow-inner">
+                                    <div 
+                                      className={`h-full rounded-full transition-all duration-1000 ease-out ${progressPct === 100 ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : progressPct > 0 ? 'bg-gradient-to-r from-blue-400 to-indigo-500' : 'bg-transparent'}`} 
+                                      style={{ width: `${progressPct}%` }}
+                                    ></div>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          }) : (
+                            <tr>
+                              <td colSpan="5" className="p-16 text-center">
+                                <div className="flex flex-col items-center justify-center text-slate-400">
+                                  <Search size={48} className="mb-4 text-slate-200"/>
+                                  <p className="font-bold text-lg text-slate-500">ไม่พบข้อมูลสาขา</p>
+                                  <p className="text-sm">ลองปรับตัวกรองค้นหาด้านบนอีกครั้ง</p>
                                 </div>
                               </td>
                             </tr>
-                          );
-                        }) : (
-                          <tr>
-                            <td colSpan="5" className="p-10 text-center text-slate-400 font-medium">
-                              <div className="flex flex-col items-center justify-center">
-                                <Search size={40} className="text-slate-200 mb-3"/>
-                                ไม่พบข้อมูลตามเงื่อนไขที่เลือก
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
 
@@ -1568,36 +1483,58 @@
 
             {/* Modal: Settings */}
             {showSettings && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-                <div className="bg-white p-6 rounded-3xl shadow-2xl w-full max-w-md relative zoom-in-95">
-                  <button onClick={()=>setShowSettings(false)} className="absolute top-5 right-5 text-slate-400 hover:text-slate-800 bg-slate-100 p-1.5 rounded-full transition-colors"><X size={18}/></button>
-                  <h3 className="font-bold text-xl mb-2 flex items-center"><Settings className="mr-2 text-slate-500"/>ตั้งค่า Master Data</h3>
-                  <p className="text-sm text-slate-500 mb-6">อัปโหลดไฟล์ CSV เพื่ออัปเดตข้อมูลระบบ</p>
-                  <div className="space-y-3">
-                    <label className="flex items-center justify-between border-2 border-dashed border-slate-200 p-4 rounded-2xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all group">
-                      <div>
-                        <span className="text-sm font-bold text-slate-700 block">1. อัปเดตไฟล์สาขา</span>
-                        <span className="text-xs text-slate-400">รูปแบบ: รหัสสาขา | ชื่อสาขา | Area</span>
+              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+                <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg relative overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
+                  <div className="px-6 py-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                    <h3 className="font-extrabold text-xl text-slate-800 flex items-center"><Settings className="mr-2.5 text-blue-600"/>การตั้งค่าระบบ (Settings)</h3>
+                    <button onClick={()=>setShowSettings(false)} className="text-slate-400 hover:text-slate-800 bg-white hover:bg-slate-200 p-2 rounded-full transition-colors shadow-sm"><X size={18}/></button>
+                  </div>
+                  <div className="p-6 space-y-6 overflow-y-auto hide-scrollbar max-h-[70vh]">
+                    
+                    {/* ส่วนตั้งค่า LINE Notify */}
+                    <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-5 rounded-2xl border border-green-100">
+                      <h4 className="font-bold text-green-800 flex items-center mb-3"><Send size={18} className="mr-2"/> ตั้งค่า LINE Notify</h4>
+                      <p className="text-xs text-green-600 mb-3 font-medium">ใส่ Token เพื่อให้ระบบสามารถส่งสรุปรายงานเข้ากลุ่ม LINE ได้</p>
+                      <input 
+                        type="text" 
+                        value={lineToken} 
+                        onChange={(e) => { setLineToken(e.target.value); localStorage.setItem('hr_line_token', e.target.value); }} 
+                        placeholder="วาง LINE Notify Token ที่นี่..." 
+                        className="w-full bg-white border border-green-200 rounded-xl px-4 py-3 text-sm font-semibold outline-none focus:border-green-500 focus:ring-4 focus:ring-green-500/10 transition-all shadow-sm text-slate-700"
+                      />
+                    </div>
+
+                    {/* ส่วนอัปเดต Master Data */}
+                    <div>
+                      <h4 className="font-bold text-slate-800 mb-3 flex items-center"><Database size={18} className="mr-2 text-slate-400"/> อัปเดต Master Data (CSV)</h4>
+                      <div className="space-y-3">
+                        <label className="flex items-center justify-between border-2 border-dashed border-slate-200 p-4 rounded-2xl cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition-all group bg-white">
+                          <div>
+                            <span className="text-sm font-bold text-slate-700 block mb-0.5">1. อัปเดตไฟล์สาขา</span>
+                            <span className="text-[10px] text-slate-400 font-medium">โครงสร้าง: รหัสสาขา | ชื่อสาขา | Area</span>
+                          </div>
+                          <div className="bg-slate-100 p-2.5 rounded-xl shadow-inner text-slate-400 group-hover:text-blue-600 group-hover:bg-white transition-all"><Upload size={18}/></div>
+                          <input type="file" className="hidden" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" onChange={e=>{handleImportCSV(e);setShowSettings(false)}}/>
+                        </label>
+                        <label className="flex items-center justify-between border-2 border-dashed border-slate-200 p-4 rounded-2xl cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition-all group bg-white">
+                          <div>
+                            <span className="text-sm font-bold text-slate-700 block mb-0.5">2. ไฟล์ตำแหน่งงาน-TA</span>
+                            <span className="text-[10px] text-slate-400 font-medium">โครงสร้าง: ตำแหน่ง | ชื่อ TA | Area</span>
+                          </div>
+                          <div className="bg-slate-100 p-2.5 rounded-xl shadow-inner text-slate-400 group-hover:text-blue-600 group-hover:bg-white transition-all"><Upload size={18}/></div>
+                          <input type="file" className="hidden" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" onChange={e=>{handleImportPositionCSV(e);setShowSettings(false)}}/>
+                        </label>
+                        <label className="flex items-center justify-between border-2 border-dashed border-slate-200 p-4 rounded-2xl cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition-all group bg-white">
+                          <div>
+                            <span className="text-sm font-bold text-slate-700 block mb-0.5">3. ไฟล์รายชื่อ TA</span>
+                            <span className="text-[10px] text-slate-400 font-medium">โครงสร้าง: รายชื่อ TA (1 คอลัมน์)</span>
+                          </div>
+                          <div className="bg-slate-100 p-2.5 rounded-xl shadow-inner text-slate-400 group-hover:text-blue-600 group-hover:bg-white transition-all"><Upload size={18}/></div>
+                          <input type="file" className="hidden" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" onChange={e=>{handleImportTACSV(e);setShowSettings(false)}}/>
+                        </label>
                       </div>
-                      <div className="bg-white p-2 rounded-full shadow-sm text-slate-400 group-hover:text-blue-500"><Upload size={18}/></div>
-                      <input type="file" className="hidden" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" onChange={e=>{handleImportCSV(e);setShowSettings(false)}}/>
-                    </label>
-                    <label className="flex items-center justify-between border-2 border-dashed border-slate-200 p-4 rounded-2xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all group">
-                      <div>
-                        <span className="text-sm font-bold text-slate-700 block">2. ไฟล์ตำแหน่งงาน-TA</span>
-                        <span className="text-xs text-slate-400">รูปแบบ: ตำแหน่ง | ชื่อ TA | Area</span>
-                      </div>
-                      <div className="bg-white p-2 rounded-full shadow-sm text-slate-400 group-hover:text-blue-500"><Upload size={18}/></div>
-                      <input type="file" className="hidden" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" onChange={e=>{handleImportPositionCSV(e);setShowSettings(false)}}/>
-                    </label>
-                    <label className="flex items-center justify-between border-2 border-dashed border-slate-200 p-4 rounded-2xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all group">
-                      <div>
-                        <span className="text-sm font-bold text-slate-700 block">3. ไฟล์รายชื่อ TA</span>
-                        <span className="text-xs text-slate-400">รูปแบบ: รายชื่อ TA 1 คอลัมน์</span>
-                      </div>
-                      <div className="bg-white p-2 rounded-full shadow-sm text-slate-400 group-hover:text-blue-500"><Upload size={18}/></div>
-                      <input type="file" className="hidden" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" onChange={e=>{handleImportTACSV(e);setShowSettings(false)}}/>
-                    </label>
+                    </div>
+
                   </div>
                 </div>
               </div>
@@ -1605,41 +1542,45 @@
             
             {/* Modal: View Applicants in Vacancy */}
             {viewApplicants && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-                <div className="bg-white p-6 rounded-3xl shadow-2xl w-full max-w-lg relative max-h-[80vh] overflow-y-auto hide-scrollbar">
-                  <button onClick={()=>setViewApplicants(null)} className="absolute top-5 right-5 text-slate-400 hover:text-slate-800 bg-slate-100 p-1.5 rounded-full"><X size={18}/></button>
-                  <h3 className="font-bold text-lg mb-1 pr-10">รายชื่อผู้สมัคร: {viewApplicants.position}</h3>
-                  <p className="text-sm text-slate-500 mb-5 flex items-center"><MapPin size={14} className="mr-1"/> {viewApplicants.branchName}</p>
+              <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+                <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl relative max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+                  <div className="px-6 py-5 border-b bg-gradient-to-r from-slate-50 to-white flex justify-between items-start shadow-sm relative z-10">
+                    <div>
+                      <h3 className="font-extrabold text-xl text-slate-800 mb-1">{viewApplicants.position}</h3>
+                      <p className="text-sm font-bold text-indigo-600 flex items-center"><MapPin size={14} className="mr-1.5"/> {viewApplicants.branchName}</p>
+                    </div>
+                    <button onClick={()=>setViewApplicants(null)} className="bg-white border border-slate-200 text-slate-400 hover:text-slate-800 hover:bg-slate-100 p-2 rounded-full transition-colors shadow-sm"><X size={18}/></button>
+                  </div>
                   
-                  <div className="space-y-3">
+                  <div className="p-6 space-y-4 overflow-y-auto hide-scrollbar bg-slate-50/50 flex-1">
                     {viewApplicants.list.map(a => (
-                      <div key={a.id} className="p-4 border rounded-2xl flex justify-between items-center hover:shadow-md transition-shadow bg-slate-50">
-                        <div className="text-sm">
-                          <p className="font-bold text-base text-slate-800">{a.name}</p>
-                          <div className="flex items-center space-x-3 mt-0.5">
-                            <p className="text-slate-500 flex items-center"><Phone size={12} className="mr-1"/>{a.phone}</p>
+                      <div key={a.id} className="p-5 border border-slate-200 rounded-2xl flex flex-col sm:flex-row justify-between sm:items-center hover:shadow-md hover:border-blue-300 transition-all bg-white group relative overflow-hidden">
+                        <div className="text-sm z-10">
+                          <p className="font-extrabold text-lg text-slate-800 mb-2">{a.name}</p>
+                          <div className="flex flex-wrap items-center gap-3">
+                            <p className="text-slate-500 font-medium flex items-center bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100"><Phone size={12} className="mr-1.5"/>{a.phone}</p>
                             {a.resumeBase64 && a.resumeBase64 !== 'Uploaded' && !String(a.resumeBase64).startsWith('Error') && (
-                              <button onClick={(e) => handleViewResume(e, a.resumeBase64, a.resumeName)} className="text-xs text-blue-600 hover:text-blue-800 flex items-center bg-blue-50 px-2 py-0.5 rounded-md transition-colors border border-blue-100">
-                                <Eye size={12} className="mr-1" /> ดูเรซูเม่
+                              <button onClick={(e) => handleViewResume(e, a.resumeBase64, a.resumeName)} className="text-[11px] font-bold text-blue-700 hover:text-white flex items-center bg-blue-50 hover:bg-blue-600 px-3 py-1.5 rounded-lg transition-all border border-blue-200 shadow-sm">
+                                <Eye size={12} className="mr-1.5" /> ดูเรซูเม่
                               </button>
                             )}
                             {a.resumeBase64 === 'Uploaded' && (
-                               <span className="text-xs text-slate-400 flex items-center bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200" title="ไฟล์ถูกบันทึกบน Cloud แล้ว">
-                                 <Paperclip size={12} className="mr-1" /> มีไฟล์แนบ
+                               <span className="text-[11px] font-bold text-slate-500 flex items-center bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200" title="ไฟล์ถูกบันทึกบน Cloud แล้ว">
+                                 <Paperclip size={12} className="mr-1.5 text-emerald-500" /> แนบไฟล์แล้ว
                                </span>
                             )}
                             {a.resumeBase64 && String(a.resumeBase64).startsWith('Error') && (
-                               <span className="text-xs text-red-500 flex items-center bg-red-50 px-2 py-0.5 rounded-md border border-red-200" title={a.resumeBase64}>
-                                 <AlertCircle size={12} className="mr-1" /> อัปโหลดล้มเหลว
+                               <span className="text-[11px] font-bold text-red-600 flex items-center bg-red-50 px-3 py-1.5 rounded-lg border border-red-200" title={a.resumeBase64}>
+                                 <AlertCircle size={12} className="mr-1.5" /> ล้มเหลว
                                </span>
                             )}
                           </div>
                         </div>
-                        <div className="text-right">
-                          <span className="text-xs font-bold px-3 py-1.5 rounded-full shadow-sm" style={{backgroundColor:STATUS_COLORS[a.status]+'15', color:STATUS_COLORS[a.status]}}>
+                        <div className="mt-4 sm:mt-0 flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-center z-10">
+                          <span className="text-xs font-extrabold px-4 py-2 rounded-xl shadow-sm border" style={{backgroundColor:STATUS_COLORS[a.status]+'15', color:STATUS_COLORS[a.status], borderColor:STATUS_COLORS[a.status]+'30'}}>
                             {a.status}
                           </span>
-                          <p className="text-[10px] mt-2 text-slate-400 flex items-center justify-end"><UserPlus size={10} className="mr-1"/> {a.ta}</p>
+                          <p className="text-[10px] mt-2 font-bold text-slate-400 flex items-center bg-slate-50 px-2 py-1 rounded-md"><UserPlus size={10} className="mr-1.5"/> {a.ta}</p>
                         </div>
                       </div>
                     ))}
@@ -1650,53 +1591,53 @@
 
             {/* Modal: Dashboard Details Popup */}
             {dashboardDetailModal && (
-              <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-                <div className="bg-white p-6 rounded-3xl shadow-2xl w-full max-w-3xl relative max-h-[85vh] flex flex-col zoom-in-95">
-                  <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-4 shrink-0">
-                    <h3 className="font-bold text-xl text-slate-800 flex items-center">
-                       {dashboardDetailModal.type === 'vacancy' ? <Briefcase className="mr-2 text-blue-600" size={24}/> : <Users className="mr-2 text-blue-600" size={24}/>}
+              <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+                <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl relative max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+                  <div className="px-6 py-5 border-b bg-gradient-to-r from-slate-50 to-white flex justify-between items-center shadow-sm relative z-10">
+                    <h3 className="font-extrabold text-xl text-slate-800 flex items-center">
+                       <div className={`p-2 rounded-xl mr-3 ${dashboardDetailModal.type === 'vacancy' ? 'bg-blue-100 text-blue-700' : 'bg-indigo-100 text-indigo-700'}`}>
+                         {dashboardDetailModal.type === 'vacancy' ? <Briefcase size={20}/> : <Users size={20}/>}
+                       </div>
                        {dashboardDetailModal.title}
-                       <span className="ml-3 bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm font-bold shadow-sm">{dashboardDetailModal.data.length} รายการ</span>
+                       <span className="ml-4 bg-slate-800 text-white px-3 py-1 rounded-lg text-xs font-black shadow-md">{dashboardDetailModal.data.length} รายการ</span>
                     </h3>
-                    <button onClick={()=>setDashboardDetailModal(null)} className="text-slate-400 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 p-2 rounded-full transition-colors"><X size={18}/></button>
+                    <button onClick={()=>setDashboardDetailModal(null)} className="bg-white border border-slate-200 text-slate-400 hover:text-slate-800 hover:bg-slate-100 p-2 rounded-full transition-colors shadow-sm"><X size={18}/></button>
                   </div>
-                  <div className="overflow-y-auto pr-2 space-y-3 flex-1 hide-scrollbar">
+                  <div className="overflow-y-auto p-6 space-y-4 flex-1 bg-slate-50/50 hide-scrollbar">
                     {dashboardDetailModal.data.length === 0 ? (
-                      <div className="text-center text-slate-400 py-10 flex flex-col items-center">
-                        <Search size={48} className="text-slate-200 mb-3"/>
-                        <p>ไม่มีข้อมูลที่ตรงกับสถานะนี้</p>
+                      <div className="text-center text-slate-400 py-16 flex flex-col items-center">
+                        <Search size={56} className="text-slate-200 mb-4"/>
+                        <p className="font-bold text-lg">ไม่มีข้อมูลที่ตรงกับสถานะนี้</p>
                       </div>
                     ) : (
                       dashboardDetailModal.data.map((item, idx) => (
-                        <div key={item.id || idx} className="p-4 border border-slate-100 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 hover:border-blue-300 hover:shadow-md transition-all bg-white">
+                        <div key={item.id || idx} className="p-5 border border-slate-200 rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:shadow-md hover:border-blue-300 transition-all bg-white group">
                           {dashboardDetailModal.type === 'vacancy' ? (
                             <>
                               <div className="text-sm">
-                                <p className="font-bold text-base text-slate-800">{item.position}</p>
-                                <div className="text-slate-500 mt-1 flex flex-col font-medium gap-1.5">
-                                  <div className="flex items-center">
-                                    <MapPin size={14} className="mr-1.5 text-slate-400"/> {item.branchName} 
+                                <p className="font-extrabold text-lg text-slate-800 mb-2">{item.position}</p>
+                                <div className="text-slate-500 flex flex-col sm:flex-row font-medium gap-2 sm:items-center">
+                                  <div className="flex items-center bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">
+                                    <MapPin size={12} className="mr-1.5 text-slate-400"/> <span className="font-bold">{item.branchName}</span> 
                                     <span className="mx-2 text-slate-300">|</span> 
-                                    <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md text-xs">{item.area}</span>
+                                    <span className="text-blue-600 font-extrabold uppercase text-[10px]">{item.area}</span>
                                   </div>
-                                  {/* แสดงข้อมูลผู้สมัครที่ทำให้สถานะสำเร็จ */}
                                   {['Hired', 'Waiting to Join'].includes(item.insight.computedStatus) && (
-                                    <div className="text-[11px] text-slate-500 flex items-center bg-slate-50 w-fit px-2 py-1 rounded-md border border-slate-100">
-                                      <UserPlus size={12} className="mr-1.5 text-slate-400"/>
-                                      ผู้สมัคร: <span className="font-bold text-slate-700 ml-1">{item.insight.matchedApplicants.find(a => ['ผ่านสัมภาษณ์', 'รอเริ่มงาน'].includes(a.status))?.name || 'ไม่ระบุ'}</span>
+                                    <div className="text-[11px] text-slate-500 flex items-center bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-lg border border-indigo-100 font-bold">
+                                      <UserPlus size={12} className="mr-1.5"/>
+                                      คนสมัคร: <span className="ml-1">{item.insight.matchedApplicants.find(a => ['ผ่านสัมภาษณ์', 'รอเริ่มงาน'].includes(a.status))?.name || 'ไม่ระบุ'}</span>
                                     </div>
                                   )}
-                                  {/* แสดงข้อมูลวันที่มีผลของ Promote&Transfer Done */}
                                   {item.insight.computedStatus === 'Promote&Transfer Done' && item.effectiveDate && (
-                                    <div className="text-[11px] text-emerald-600 flex items-center bg-emerald-50 w-fit px-2 py-1 rounded-md border border-emerald-100">
+                                    <div className="text-[11px] flex items-center bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg border border-emerald-100 font-bold">
                                       <Clock size={12} className="mr-1.5"/>
-                                      วันที่มีผล: <span className="font-bold ml-1">{new Date(item.effectiveDate).toLocaleDateString('th')}</span>
+                                      มีผล: <span className="ml-1">{new Date(item.effectiveDate).toLocaleDateString('th')}</span>
                                     </div>
                                   )}
                                 </div>
                               </div>
-                              <div className="text-left sm:text-right shrink-0 mt-2 sm:mt-0 flex items-center sm:items-end justify-between sm:justify-center w-full sm:w-auto">
-                                <span className="text-xs font-bold px-3 py-1.5 rounded-full shadow-sm inline-block" style={{backgroundColor:VACANCY_COLORS[item.insight.computedStatus]+'15', color:VACANCY_COLORS[item.insight.computedStatus]}}>
+                              <div className="text-left sm:text-right shrink-0 w-full sm:w-auto flex justify-end">
+                                <span className="text-xs font-extrabold px-4 py-2 rounded-xl shadow-sm border" style={{backgroundColor:VACANCY_COLORS[item.insight.computedStatus]+'15', color:VACANCY_COLORS[item.insight.computedStatus], borderColor:VACANCY_COLORS[item.insight.computedStatus]+'30'}}>
                                   {item.insight.computedStatus}
                                 </span>
                               </div>
@@ -1704,45 +1645,34 @@
                           ) : (
                             <>
                               <div className="text-sm">
-                                <p className="font-bold text-base text-slate-800">{item.name}</p>
-                                <div className="text-slate-500 mt-1 flex items-center flex-wrap gap-y-1 font-medium">
-                                  <span className="flex items-center"><Briefcase size={14} className="mr-1.5 text-slate-400"/> {item.position}</span>
-                                  <span className="mx-2 text-slate-300 hidden sm:inline">|</span>
-                                  <span className="flex items-center mt-1 sm:mt-0"><MapPin size={14} className="mr-1.5 ml-0 sm:ml-1 text-slate-400"/> {item.branchName}</span>
-                                  <span className="mx-2 text-slate-300 hidden sm:inline">|</span>
-                                  <span className="flex items-center mt-1 sm:mt-0"><Phone size={14} className="mr-1.5 ml-0 sm:ml-1 text-slate-400"/> {item.phone}</span>
+                                <p className="font-extrabold text-lg text-slate-800 mb-2">{item.name}</p>
+                                <div className="text-slate-500 flex items-center flex-wrap gap-2 font-medium">
+                                  <span className="flex items-center bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100"><Briefcase size={12} className="mr-1.5 text-slate-400"/> <span className="font-bold">{item.position}</span></span>
+                                  <span className="flex items-center bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100"><MapPin size={12} className="mr-1.5 text-slate-400"/> <span className="font-bold">{item.branchName}</span></span>
+                                  <span className="flex items-center bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100"><Phone size={12} className="mr-1.5 text-slate-400"/> <span className="font-bold">{item.phone}</span></span>
                                   
                                   {item.resumeBase64 && item.resumeBase64 !== 'Uploaded' && !String(item.resumeBase64).startsWith('Error') && (
-                                    <>
-                                      <span className="mx-2 text-slate-300 hidden sm:inline">|</span>
-                                      <button onClick={(e) => handleViewResume(e, item.resumeBase64, item.resumeName)} className="text-xs text-blue-600 hover:text-blue-800 flex items-center bg-blue-50 px-2 py-0.5 rounded-md transition-colors border border-blue-100 mt-1 sm:mt-0">
-                                        <Eye size={12} className="mr-1" /> ดูเรซูเม่
-                                      </button>
-                                    </>
+                                    <button onClick={(e) => handleViewResume(e, item.resumeBase64, item.resumeName)} className="text-[11px] text-blue-700 hover:text-white font-bold flex items-center bg-blue-50 hover:bg-blue-600 px-3 py-1 rounded-lg transition-all border border-blue-200 shadow-sm">
+                                      <Eye size={12} className="mr-1.5" /> ดูเรซูเม่
+                                    </button>
                                   )}
                                   {item.resumeBase64 === 'Uploaded' && (
-                                    <>
-                                      <span className="mx-2 text-slate-300 hidden sm:inline">|</span>
-                                      <span className="text-xs text-slate-400 flex items-center bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200 mt-1 sm:mt-0" title="ไฟล์ถูกบันทึกบน Cloud แล้ว">
-                                        <Paperclip size={12} className="mr-1" /> มีไฟล์แนบ
-                                      </span>
-                                    </>
+                                    <span className="text-[11px] text-slate-500 font-bold flex items-center bg-slate-100 px-3 py-1 rounded-lg border border-slate-200" title="ไฟล์ถูกบันทึกบน Cloud แล้ว">
+                                      <CheckCircle2 size={12} className="mr-1.5 text-emerald-500" /> มีไฟล์แนบ
+                                    </span>
                                   )}
                                   {item.resumeBase64 && String(item.resumeBase64).startsWith('Error') && (
-                                    <>
-                                      <span className="mx-2 text-slate-300 hidden sm:inline">|</span>
-                                      <span className="text-xs text-red-500 flex items-center bg-red-50 px-2 py-0.5 rounded-md border border-red-200 mt-1 sm:mt-0" title={item.resumeBase64}>
-                                        <AlertCircle size={12} className="mr-1" /> อัปโหลดล้มเหลว
-                                      </span>
-                                    </>
+                                    <span className="text-[11px] text-red-600 font-bold flex items-center bg-red-50 px-3 py-1 rounded-lg border border-red-200" title={item.resumeBase64}>
+                                      <AlertCircle size={12} className="mr-1.5" /> อัปโหลดล้มเหลว
+                                    </span>
                                   )}
                                 </div>
                               </div>
-                              <div className="text-left sm:text-right shrink-0 mt-2 sm:mt-0 w-full sm:w-auto flex flex-row sm:flex-col justify-between sm:justify-center items-center sm:items-end">
-                                <span className="text-xs font-bold px-3 py-1.5 rounded-full shadow-sm inline-block" style={{backgroundColor:(STATUS_COLORS[item.status]||'#cbd5e1')+'15', color:STATUS_COLORS[item.status]||'#64748b'}}>
+                              <div className="text-left sm:text-right shrink-0 w-full sm:w-auto flex flex-row sm:flex-col justify-between sm:justify-end items-center sm:items-end gap-2 mt-3 sm:mt-0">
+                                <span className="text-xs font-extrabold px-4 py-2 rounded-xl shadow-sm border" style={{backgroundColor:(STATUS_COLORS[item.status]||'#cbd5e1')+'15', color:STATUS_COLORS[item.status]||'#64748b', borderColor: (STATUS_COLORS[item.status]||'#cbd5e1')+'30'}}>
                                   {item.status}
                                 </span>
-                                <p className="text-[10px] sm:mt-2 text-slate-400 flex items-center bg-slate-50 px-2 py-1 rounded-md"><UserPlus size={10} className="mr-1.5"/> {item.ta}</p>
+                                <p className="text-[10px] font-bold text-slate-400 flex items-center bg-slate-50 px-2 py-1 rounded-md"><UserPlus size={10} className="mr-1.5"/> {item.ta}</p>
                               </div>
                             </>
                           )}
@@ -1756,29 +1686,35 @@
             
             {/* Modal: Preview File */}
             {previewFile && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
-                <div className="bg-white p-2 rounded-2xl w-full max-w-4xl h-[85vh] flex flex-col relative shadow-2xl">
-                  <div className="absolute -top-4 -right-4 flex space-x-2">
-                    <button onClick={() => handleDownloadFile(previewFile.base64, previewFile.name)} className="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-2 shadow-lg transition-colors border border-blue-700" title="ดาวน์โหลดไฟล์"><Download size={20}/></button>
-                    <button onClick={()=>setPreviewFile(null)} className="bg-white hover:bg-slate-100 text-slate-800 rounded-full p-2 shadow-lg transition-colors border" title="ปิดหน้าต่าง"><X size={20}/></button>
+              <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
+                <div className="bg-white p-2 rounded-3xl w-full max-w-5xl h-[85vh] flex flex-col relative shadow-2xl animate-in zoom-in-95">
+                  <div className="absolute -top-5 -right-5 flex space-x-3">
+                    <button onClick={() => handleDownloadFile(previewFile.base64, previewFile.name)} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-full p-3 shadow-lg shadow-blue-500/40 transition-all hover:-translate-y-1 border border-white/20" title="ดาวน์โหลดไฟล์"><Download size={22}/></button>
+                    <button onClick={()=>setPreviewFile(null)} className="bg-white hover:bg-slate-100 text-slate-800 rounded-full p-3 shadow-lg transition-all hover:-translate-y-1 border border-slate-200" title="ปิดหน้าต่าง"><X size={22}/></button>
                   </div>
                   {previewFile.base64.startsWith('data:image/') || previewFile.base64.startsWith('data:application/pdf') ? 
-                    <iframe src={previewFile.base64} className="w-full h-full rounded-xl border-none bg-slate-100"/> : 
-                    <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
-                      <FileText size={48} className="text-blue-300 mb-4"/>
-                      <h3 className="font-bold text-xl mb-6 text-slate-700">{previewFile.name}</h3>
-                      <button onClick={() => handleDownloadFile(previewFile.base64, previewFile.name)} className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-bold flex items-center shadow-md transition-colors">
-                        <Download size={20} className="mr-2"/> ดาวน์โหลดไฟล์
+                    <iframe src={previewFile.base64} className="w-full h-full rounded-2xl border border-slate-200 bg-slate-50 shadow-inner"/> : 
+                    <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-slate-50 rounded-2xl border border-slate-100">
+                      <div className="w-24 h-24 bg-blue-100 text-blue-500 rounded-full flex items-center justify-center mb-6 shadow-inner"><FileText size={48} /></div>
+                      <h3 className="font-extrabold text-2xl mb-8 text-slate-800 max-w-xl truncate">{previewFile.name}</h3>
+                      <button onClick={() => handleDownloadFile(previewFile.base64, previewFile.name)} className="bg-slate-800 hover:bg-slate-900 text-white px-10 py-4 rounded-2xl font-bold flex items-center shadow-xl hover:-translate-y-1 transition-all">
+                        <Download size={22} className="mr-3"/> ดาวน์โหลดไฟล์ไปยังเครื่อง
                       </button>
                     </div>
                   }
                 </div>
               </div>
             )}
+
+            {/* ไอคอน Settings สำหรับเมนูต่างๆ (ฟังก์ชันนี้ไม่เปลี่ยน) */}
+            <Database className="hidden"/> 
           </main>
         </div>
       );
     }
+
+    // สร้าง Component เปล่าๆ ป้องกัน Error ขาด Icon
+    function Database(props) { return <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg>; }
 
     const root = createRoot(document.getElementById('root'));
     root.render(<App />);
