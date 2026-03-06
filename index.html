@@ -27,9 +27,10 @@
   <script type="text/babel" data-type="module">
     import React, { useState, useMemo, useEffect } from 'https://esm.sh/react@18.2.0';
     import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
-    import { Users, UserPlus, BarChart3, Building2, CheckCircle2, Clock, MapPin, Search, AlertCircle, FileText, Briefcase, Phone, MessageSquare, Map, Target, Edit, Trash2, X, BellRing, Download, Paperclip, Upload, Eye, PlusCircle, Settings, Check, Filter } from 'https://esm.sh/lucide-react@0.344.0?deps=react@18.2.0';
+    import { Users, UserPlus, BarChart3, Building2, CheckCircle2, Clock, MapPin, Search, AlertCircle, FileText, Briefcase, Phone, MessageSquare, Map, Target, Edit, Trash2, X, BellRing, Download, Paperclip, Upload, Eye, PlusCircle, Settings, Check, Filter, Loader2 } from 'https://esm.sh/lucide-react@0.344.0?deps=react@18.2.0';
 
-    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw1-78XcjUZoYLoiY9IkotbyoNUQ8JrqoL6_nJCPUF1_NO_RbpkqYgHjOaovIDMqTJwWw/exec"; 
+    // ใส่ URL ใหม่ที่คุณ Deploy ได้มาตรงนี้ครับ
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw8gOemK9nDgFTffllbI15AelpJKzA5Kk-pFwwH7BoYZ6PFdGHR6FqK53-O_KnBpsyWCQ/exec"; 
 
     const DEFAULT_TAS = ['TA 1 (คุณเอ)', 'TA 2 (คุณบี)', 'TA 3 (คุณซี)', 'TA 4 (คุณดี)'];
     const DEFAULT_POSITIONS = [
@@ -114,8 +115,9 @@
     };
 
     function App() {
-      const [activeTab, setActiveTab] = useState('area_hr');
+      const [activeTab, setActiveTab] = useState('entry');
       const [isLoading, setIsLoading] = useState(true); 
+      const [isSaving, setIsSaving] = useState(false); // State เพิ่มสำหรับตอนกำลังอัปโหลดไฟล์
       const [cloudStatus, setCloudStatus] = useState('loading'); 
       const [appBranches, setAppBranches] = useState([]);
       const [appAreas, setAppAreas] = useState([]);
@@ -419,6 +421,8 @@
           return; 
         }
         
+        setIsSaving(true); // เปิดสถานะกำลังบันทึก
+
         const newRecord = { 
           id: Date.now().toString() + '_' + Math.floor(Math.random() * 1000).toString().padStart(3, '0'), 
           ta: selectedTA, 
@@ -435,13 +439,14 @@
         setFormData({ name: '', phone: '', status: '', comment: '', startDate: '', resumeName: '', resumeBase64: '' });
         setAddingApplicantFor(null); 
         
-        syncToCloud(newApps, vacancies);
+        await syncToCloud(newApps, vacancies);
 
         setTimeout(() => {
           setApplicants(prevApps => prevApps.map(a => 
             String(a.id) === String(newRecord.id) ? { ...a, resumeBase64: 'Uploaded' } : a
           ));
-        }, 500);
+          setIsSaving(false); // ปิดสถานะบันทึกเสร็จสิ้น
+        }, 1500);
       };
 
       const deleteApplicant = (id) => {
@@ -453,7 +458,7 @@
 
       const startEditApp = (app) => { setEditAppId(app.id); setEditAppForm({ ...app }); };
       
-      const saveEditApp = () => {
+      const saveEditApp = async () => {
         if (['อื่นๆ', 'ติดต่อผู้สมัครไม่ได้', 'ยกเลิกสัมภาษณ์/ไม่มาตามนัด', 'ไม่ผ่านสัมภาษณ์', 'ไม่มีตำแหน่งงานว่าง'].includes(editAppForm.status) && !editAppForm.comment) { 
           alert('กรุณาระบุเหตุผล'); 
           return; 
@@ -463,11 +468,12 @@
           return; 
         }
 
+        setIsSaving(true); // เปิดสถานะกำลังบันทึก
         if (!['อื่นๆ', 'ติดต่อผู้สมัครไม่ได้', 'ยกเลิกสัมภาษณ์/ไม่มาตามนัด', 'ไม่ผ่านสัมภาษณ์', 'ไม่มีตำแหน่งงานว่าง'].includes(editAppForm.status)) editAppForm.comment = '';
         
         const newApps = applicants.map(a => String(a.id) === String(editAppId) ? { ...editAppForm, updatedAt: Date.now() } : a);
         setApplicants(newApps); 
-        syncToCloud(newApps, vacancies);
+        await syncToCloud(newApps, vacancies);
 
         // ทำการล้าง Base64 ออกจาก State หลังจากกดบันทึกแล้ว เพื่อลดการใช้หน่วยความจำ
         if (editAppForm.resumeBase64 && editAppForm.resumeBase64.length > 1000 && !editAppForm.resumeBase64.startsWith('http')) {
@@ -475,9 +481,13 @@
             setApplicants(prevApps => prevApps.map(a => 
               String(a.id) === String(editAppId) ? { ...a, resumeBase64: 'Uploaded' } : a
             ));
-          }, 500);
+            setIsSaving(false);
+            setEditAppId(null);
+          }, 1500);
+        } else {
+          setIsSaving(false);
+          setEditAppId(null);
         }
-        setEditAppId(null);
       };
 
       const handleInlineStatusChange = (app, newStatus) => {
@@ -1181,25 +1191,26 @@
                                 <tr key={app.id} className="bg-blue-50/50">
                                   <td className="p-3 font-semibold text-xs">{app.branchName}</td>
                                   <td className="p-3 space-y-1">
-                                    <input value={editAppForm.name} onChange={e=>setEditAppForm({...editAppForm, name:e.target.value})} className="w-full border p-1.5 text-xs rounded"/>
-                                    <input value={editAppForm.phone} onChange={e=>setEditAppForm({...editAppForm, phone:e.target.value})} className="w-full border p-1.5 text-xs rounded"/>
-                                    {/* เพิ่มปุ่มอัปโหลดไฟล์ตอนแก้ไข */}
-                                    <div className="mt-1.5 border border-dashed border-slate-300 p-1 rounded bg-white flex items-center">
+                                    <input value={editAppForm.name} onChange={e=>setEditAppForm({...editAppForm, name:e.target.value})} className="w-full border p-1.5 text-xs rounded" disabled={isSaving}/>
+                                    <input value={editAppForm.phone} onChange={e=>setEditAppForm({...editAppForm, phone:e.target.value})} className="w-full border p-1.5 text-xs rounded" disabled={isSaving}/>
+                                    <div className={`mt-1.5 border border-dashed border-slate-300 p-1 rounded bg-white flex items-center ${isSaving ? 'opacity-50' : ''}`}>
                                       <Upload size={12} className="text-slate-400 shrink-0 mx-1"/>
-                                      <input type="file" onChange={handleEditFileUpload} className="text-[9px] w-full text-slate-600 file:mr-1 file:py-0.5 file:px-2 file:rounded file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"/>
+                                      <input type="file" onChange={handleEditFileUpload} disabled={isSaving} className="text-[9px] w-full text-slate-600 file:mr-1 file:py-0.5 file:px-2 file:rounded file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"/>
                                     </div>
                                     {editAppForm.resumeName && <div className="text-[9px] text-blue-600 truncate mt-0.5" title={editAppForm.resumeName}>ไฟล์: {editAppForm.resumeName}</div>}
                                   </td>
                                   <td className="p-3 space-y-1 min-w-[200px]">
-                                    <select value={editAppForm.status} onChange={e=>setEditAppForm({...editAppForm, status:e.target.value})} className="w-full border p-1.5 text-xs rounded">
+                                    <select value={editAppForm.status} onChange={e=>setEditAppForm({...editAppForm, status:e.target.value})} className="w-full border p-1.5 text-xs rounded" disabled={isSaving}>
                                       {STATUSES.map(s=><option key={s}>{s}</option>)}
                                     </select>
-                                    {editAppForm.status==='รอเริ่มงาน' && <input type="date" value={editAppForm.startDate||''} onChange={e=>setEditAppForm({...editAppForm, startDate:e.target.value})} className="w-full border border-sky-400 p-1.5 text-xs rounded" title="วันที่เริ่มงาน"/>}
-                                    {['อื่นๆ', 'ติดต่อผู้สมัครไม่ได้', 'ยกเลิกสัมภาษณ์/ไม่มาตามนัด', 'ไม่ผ่านสัมภาษณ์', 'ไม่มีตำแหน่งงานว่าง'].includes(editAppForm.status) && <input placeholder="ระบุเหตุผล" value={editAppForm.comment||''} onChange={e=>setEditAppForm({...editAppForm, comment:e.target.value})} className="w-full border border-orange-300 p-1.5 text-xs rounded"/>}
+                                    {editAppForm.status==='รอเริ่มงาน' && <input type="date" value={editAppForm.startDate||''} onChange={e=>setEditAppForm({...editAppForm, startDate:e.target.value})} className="w-full border border-sky-400 p-1.5 text-xs rounded" title="วันที่เริ่มงาน" disabled={isSaving}/>}
+                                    {['อื่นๆ', 'ติดต่อผู้สมัครไม่ได้', 'ยกเลิกสัมภาษณ์/ไม่มาตามนัด', 'ไม่ผ่านสัมภาษณ์', 'ไม่มีตำแหน่งงานว่าง'].includes(editAppForm.status) && <input placeholder="ระบุเหตุผล" value={editAppForm.comment||''} onChange={e=>setEditAppForm({...editAppForm, comment:e.target.value})} className="w-full border border-orange-300 p-1.5 text-xs rounded" disabled={isSaving}/>}
                                   </td>
                                   <td className="p-3 text-right">
-                                    <button onClick={saveEditApp} className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 px-2 py-1.5 rounded text-xs mr-2 font-bold transition-colors">บันทึก</button>
-                                    <button onClick={()=>setEditAppId(null)} className="bg-slate-200 hover:bg-slate-300 px-2 py-1.5 rounded text-xs transition-colors">ยกเลิก</button>
+                                    <button onClick={saveEditApp} disabled={isSaving} className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 px-3 py-1.5 rounded text-xs mr-2 font-bold transition-colors disabled:opacity-50">
+                                      {isSaving ? <span className="flex items-center"><Loader2 size={12} className="animate-spin mr-1"/>บันทึก...</span> : 'บันทึก'}
+                                    </button>
+                                    <button onClick={()=>setEditAppId(null)} disabled={isSaving} className="bg-slate-200 hover:bg-slate-300 px-3 py-1.5 rounded text-xs transition-colors disabled:opacity-50">ยกเลิก</button>
                                   </td>
                                 </tr>
                               )
@@ -1256,30 +1267,32 @@
                     <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
                       <div className="px-6 py-4 border-b bg-blue-600 text-white flex justify-between items-center">
                         <h3 className="font-bold">เพิ่มผู้สมัคร: {addingApplicantFor.position}</h3>
-                        <button onClick={()=>setAddingApplicantFor(null)} className="hover:bg-white/20 p-1 rounded-full transition-colors"><X size={20}/></button>
+                        <button onClick={()=>setAddingApplicantFor(null)} disabled={isSaving} className="hover:bg-white/20 p-1 rounded-full transition-colors disabled:opacity-50"><X size={20}/></button>
                       </div>
                       <form onSubmit={handleRecruitSubmit} className="p-6 space-y-4">
-                        <input required placeholder="ชื่อ-นามสกุล" value={formData.name} onChange={handleInputChange} name="name" className="w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-colors"/>
-                        <input required type="tel" placeholder="เบอร์โทร" value={formData.phone} onChange={handleInputChange} name="phone" className="w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-colors"/>
-                        <select required name="status" value={formData.status} onChange={handleInputChange} className="w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-colors">
+                        <input required placeholder="ชื่อ-นามสกุล" value={formData.name} onChange={handleInputChange} name="name" disabled={isSaving} className="w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-colors"/>
+                        <input required type="tel" placeholder="เบอร์โทร" value={formData.phone} onChange={handleInputChange} name="phone" disabled={isSaving} className="w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-colors"/>
+                        <select required name="status" value={formData.status} onChange={handleInputChange} disabled={isSaving} className="w-full border rounded-xl p-3 outline-none focus:border-blue-500 transition-colors">
                           <option value="">-- สถานะปัจจุบัน --</option>
                           {STATUSES.map(s=><option key={s}>{s}</option>)}
                         </select>
                         {formData.status === 'รอเริ่มงาน' && (
                           <div className="space-y-1">
                             <label className="text-xs font-bold text-sky-600 ml-1">ระบุวันที่เริ่มงาน *</label>
-                            <input required type="date" name="startDate" value={formData.startDate||''} onChange={handleInputChange} className="w-full border border-sky-300 bg-sky-50 rounded-xl p-3 outline-none focus:border-sky-500" title="วันที่เริ่มงาน"/>
+                            <input required type="date" name="startDate" value={formData.startDate||''} onChange={handleInputChange} disabled={isSaving} className="w-full border border-sky-300 bg-sky-50 rounded-xl p-3 outline-none focus:border-sky-500" title="วันที่เริ่มงาน"/>
                           </div>
                         )}
                         {['อื่นๆ', 'ติดต่อผู้สมัครไม่ได้', 'ยกเลิกสัมภาษณ์/ไม่มาตามนัด', 'ไม่ผ่านสัมภาษณ์', 'ไม่มีตำแหน่งงานว่าง'].includes(formData.status) && (
-                          <textarea required name="comment" value={formData.comment} onChange={handleInputChange} placeholder="ระบุเหตุผลที่ปฏิเสธ / ยกเลิก *" className="w-full border border-orange-300 bg-orange-50 rounded-xl p-3 outline-none focus:border-orange-500"></textarea>
+                          <textarea required name="comment" value={formData.comment} onChange={handleInputChange} disabled={isSaving} placeholder="ระบุเหตุผลที่ปฏิเสธ / ยกเลิก *" className="w-full border border-orange-300 bg-orange-50 rounded-xl p-3 outline-none focus:border-orange-500"></textarea>
                         )}
-                        <div className="flex items-center space-x-2 border p-3 rounded-xl bg-slate-50">
+                        <div className={`flex items-center space-x-2 border p-3 rounded-xl bg-slate-50 ${isSaving ? 'opacity-50' : ''}`}>
                           <Upload size={16} className="text-slate-500"/>
-                          <input type="file" onChange={handleFileUpload} className="text-sm w-full text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"/>
+                          <input type="file" onChange={handleFileUpload} disabled={isSaving} className="text-sm w-full text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"/>
                         </div>
                         <div className="pt-4 flex justify-end">
-                          <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2.5 rounded-xl shadow-md transition-colors">บันทึกข้อมูล</button>
+                          <button type="submit" disabled={isSaving} className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2.5 rounded-xl shadow-md transition-colors flex items-center disabled:opacity-70">
+                            {isSaving ? <><Loader2 size={18} className="animate-spin mr-2"/>กำลังบันทึกไฟล์...</> : 'บันทึกข้อมูล'}
+                          </button>
                         </div>
                       </form>
                     </div>
