@@ -374,6 +374,22 @@
           reader.readAsDataURL(file);
         }
       };
+
+      const handleEditFileUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          if (file.size > 3145728) {
+            alert("ไฟล์มีขนาดใหญ่เกินไป กรุณาแนบไฟล์ขนาดไม่เกิน 3MB");
+            e.target.value = '';
+            return;
+          }
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setEditAppForm(prev => ({ ...prev, resumeBase64: reader.result, resumeName: file.name }));
+          };
+          reader.readAsDataURL(file);
+        }
+      };
       
       // [แก้ไขจุดที่ 3] - ล้างค่า Base64 ออกจาก State หลักหลังกด submit เพื่อไม่ให้ค้างและเซฟซ้ำ
       const handleRecruitSubmit = async (e) => {
@@ -432,7 +448,18 @@
         if (!['อื่นๆ', 'ติดต่อผู้สมัครไม่ได้', 'ยกเลิกสัมภาษณ์/ไม่มาตามนัด', 'ไม่ผ่านสัมภาษณ์', 'ไม่มีตำแหน่งงานว่าง'].includes(editAppForm.status)) editAppForm.comment = '';
         
         const newApps = applicants.map(a => String(a.id) === String(editAppId) ? { ...editAppForm, updatedAt: Date.now() } : a);
-        setApplicants(newApps); setEditAppId(null); syncToCloud(newApps, vacancies);
+        setApplicants(newApps); 
+        syncToCloud(newApps, vacancies);
+
+        // ทำการล้าง Base64 ออกจาก State หลังจากกดบันทึกแล้ว เพื่อลดการใช้หน่วยความจำ
+        if (editAppForm.resumeBase64 && editAppForm.resumeBase64.length > 1000) {
+          setTimeout(() => {
+            setApplicants(prevApps => prevApps.map(a => 
+              String(a.id) === String(editAppId) ? { ...a, resumeBase64: 'Uploaded' } : a
+            ));
+          }, 500);
+        }
+        setEditAppId(null);
       };
 
       const handleInlineStatusChange = (app, newStatus) => {
@@ -1101,6 +1128,12 @@
                                   <td className="p-3 space-y-1">
                                     <input value={editAppForm.name} onChange={e=>setEditAppForm({...editAppForm, name:e.target.value})} className="w-full border p-1.5 text-xs rounded"/>
                                     <input value={editAppForm.phone} onChange={e=>setEditAppForm({...editAppForm, phone:e.target.value})} className="w-full border p-1.5 text-xs rounded"/>
+                                    {/* เพิ่มปุ่มอัปโหลดไฟล์ตอนแก้ไข */}
+                                    <div className="mt-1.5 border border-dashed border-slate-300 p-1 rounded bg-white flex items-center">
+                                      <Upload size={12} className="text-slate-400 shrink-0 mx-1"/>
+                                      <input type="file" onChange={handleEditFileUpload} className="text-[9px] w-full text-slate-600 file:mr-1 file:py-0.5 file:px-2 file:rounded file:border-0 file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"/>
+                                    </div>
+                                    {editAppForm.resumeName && <div className="text-[9px] text-blue-600 truncate mt-0.5" title={editAppForm.resumeName}>ไฟล์: {editAppForm.resumeName}</div>}
                                   </td>
                                   <td className="p-3 space-y-1 min-w-[200px]">
                                     <select value={editAppForm.status} onChange={e=>setEditAppForm({...editAppForm, status:e.target.value})} className="w-full border p-1.5 text-xs rounded">
