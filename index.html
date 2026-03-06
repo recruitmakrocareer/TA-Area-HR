@@ -150,6 +150,37 @@
 
       const uniquePositionNames = useMemo(() => [...new Set(appPositions.map(p => p.position))], [appPositions]);
 
+      // ฟังก์ชันสำหรับดึงข้อมูลใหม่ล่าสุดจาก Cloud
+      const fetchFreshData = async () => {
+        if (!GOOGLE_SCRIPT_URL) return null;
+        try {
+          const res = await fetch(`${GOOGLE_SCRIPT_URL}?t=${new Date().getTime()}`);
+          const data = await res.json();
+          
+          let loadedApps = [];
+          let loadedVacs = [];
+          
+          if (data.applicants) loadedApps = data.applicants.map(a => ({...a, id: String(a.id), branchCode: String(a.branchCode).padStart(3, '0')}));
+          if (data.vacancies) loadedVacs = data.vacancies.map(v => ({...v, id: String(v.id), branchCode: String(v.branchCode).padStart(3, '0')}));
+          
+          setApplicants(loadedApps);
+          setVacancies(loadedVacs);
+          
+          // บันทึกลง LocalStorage (แปลง Base64 ยาวๆ ออกก่อนเพื่อไม่ให้กินพื้นที่)
+          const safeAppsForLocal = loadedApps.map(app => ({
+            ...app,
+            resumeBase64: (app.resumeBase64 && app.resumeBase64.length > 1000 && !String(app.resumeBase64).startsWith('http')) ? 'Uploaded' : app.resumeBase64
+          }));
+          localStorage.setItem('hr_applicants', JSON.stringify(safeAppsForLocal));
+          localStorage.setItem('hr_vacancies', JSON.stringify(loadedVacs));
+          
+          return data;
+        } catch (error) {
+          console.error('Fetch fresh data error:', error);
+          throw error;
+        }
+      };
+
       useEffect(() => {
         const normalizePositions = (positions) => {
           return positions.map(p => {
@@ -165,17 +196,12 @@
         const initLoad = async () => {
           setIsLoading(true);
           setCloudStatus('loading');
-          let loadedApps = [];
-          let loadedVacs = [];
 
           try {
-            if (GOOGLE_SCRIPT_URL) {
-              const res = await fetch(`${GOOGLE_SCRIPT_URL}?t=${new Date().getTime()}`);
-              const data = await res.json();
+            const data = await fetchFreshData(); // ใช้ฟังก์ชันดึงข้อมูลร่วม
+            if (data) {
               setCloudStatus('connected');
               
-              if (data.applicants) loadedApps = data.applicants.map(a => ({...a, id: String(a.id), branchCode: String(a.branchCode).padStart(3, '0')}));
-              if (data.vacancies) loadedVacs = data.vacancies.map(v => ({...v, id: String(v.id), branchCode: String(v.branchCode).padStart(3, '0')}));
               if (data.branches && data.branches.length > 0) {
                   setAppBranches(data.branches.map(b => ({
                       ...b, 
@@ -193,10 +219,18 @@
           } catch (e) {
             console.error("ดึงข้อมูลจาก Cloud ไม่สำเร็จ", e);
             setCloudStatus('error');
+            
+            // กรณีออฟไลน์ ให้ดึงข้อมูลจาก LocalStorage
+            let loadedApps = [];
+            let loadedVacs = [];
             let localApps = localStorage.getItem('hr_applicants');
             let localVacs = localStorage.getItem('hr_vacancies');
             if (localApps) loadedApps = JSON.parse(localApps);
             if (localVacs) loadedVacs = JSON.parse(localVacs);
+            
+            setApplicants(loadedApps);
+            setVacancies(loadedVacs);
+
             const localBranches = localStorage.getItem('hr_branches');
             if (localBranches) { 
                 try { 
@@ -215,8 +249,6 @@
             else setAppPositions(DEFAULT_POSITIONS);
           }
 
-          setApplicants(loadedApps);
-          setVacancies(loadedVacs);
           setIsLoading(false);
         };
         initLoad();
@@ -278,7 +310,10 @@
               body: JSON.stringify({ action: 'saveAll', applicants: newApps, vacancies: newVacs })
             });
             setTimeout(() => setCloudStatus('connected'), 1000);
-          } catch (error) { setCloudStatus('error'); }
+          } catch (error) { 
+            setCloudStatus('error'); 
+            throw error;
+          }
         }
       };
 
@@ -435,18 +470,20 @@
         };
 
         const newApps = [...applicants, newRecord];
-        setApplicants(newApps);
+        setApplicants(newApps); // แทรกลง UI ทันที ให้ดูสมูท
+        
         setFormData({ name: '', phone: '', status: '', comment: '', startDate: '', resumeName: '', resumeBase64: '' });
         setAddingApplicantFor(null); 
         
         await syncToCloud(newApps, vacancies);
 
-        setTimeout(() => {
-          setApplicants(prevApps => prevApps.map(a => 
-            String(a.id) === String(newRecord.id) ? { ...a, resumeBase64: 'Uploaded' } : a
-          ));
-          setIsSaving(false); // ปิดสถานะบันทึกเสร็จสิ้น
-        }, 1500);
+        // ดึงข้อมูลล่าสุดจาก Cloud เพื่ออัปเดต URL ของ Drive ให้ปุ่มพรีวิวขึ้นอัตโนมัติ
+        try {
+          await fetchFreshData();
+        } catch (err) {
+          console.log("Fetch updated data failed.");
+        }
+        setIsSaving(false); // ปิดสถานะบันทึกเสร็จสิ้น
       };
 
       const deleteApplicant = (id) => {
@@ -475,19 +512,15 @@
         setApplicants(newApps); 
         await syncToCloud(newApps, vacancies);
 
-        // ทำการล้าง Base64 ออกจาก State หลังจากกดบันทึกแล้ว เพื่อลดการใช้หน่วยความจำ
-        if (editAppForm.resumeBase64 && editAppForm.resumeBase64.length > 1000 && !editAppForm.resumeBase64.startsWith('http')) {
-          setTimeout(() => {
-            setApplicants(prevApps => prevApps.map(a => 
-              String(a.id) === String(editAppId) ? { ...a, resumeBase64: 'Uploaded' } : a
-            ));
-            setIsSaving(false);
-            setEditAppId(null);
-          }, 1500);
-        } else {
-          setIsSaving(false);
-          setEditAppId(null);
+        // ดึงข้อมูลล่าสุดจาก Cloud เพื่ออัปเดต URL ของ Drive ให้ปุ่มพรีวิวขึ้นอัตโนมัติ
+        try {
+          await fetchFreshData();
+        } catch (err) {
+          console.log("Fetch updated data failed.");
         }
+        
+        setIsSaving(false);
+        setEditAppId(null);
       };
 
       const handleInlineStatusChange = (app, newStatus) => {
@@ -567,7 +600,6 @@
         setVacancies(newVacs); syncToCloud(applicants, newVacs);
       };
 
-      // ฟังก์ชันสำหรับดาวน์โหลดไฟล์จาก Base64 อย่างปลอดภัยเพื่อแก้ปัญหา File wasn't available
       const handleDownloadFile = (base64String, fileName) => {
         if (!base64String || base64String === 'Uploaded') return;
         
